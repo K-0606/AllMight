@@ -1,0 +1,21 @@
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+Packages/VBTKit/.build/
+
+# 測試影片（含個人影像，不要 commit）
+TestVideos/
+
+# 影片檔不進 git（參考螢幕錄影等；超過 GitHub 100MB 限制，需保留請改用 Git LFS）
+*.mp4
+*.mov
+
+# macOS
+.DS_Store
+
+# Claude Code 個人設定
+.claude/settings.local.json
+CLAUDE.local.md

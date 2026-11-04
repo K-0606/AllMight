@@ -6,8 +6,24 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BC5B1096309B71160092266C /* VBTCore in Frameworks */ = {isa = PBXBuildFile; productRef = BC5B1095309B71160092266C /* VBTCore */; };
+		BC5B1098309B71160092266C /* VBTVision in Frameworks */ = {isa = PBXBuildFile; productRef = BC5B1097309B71160092266C /* VBTVision */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		BC5B10A1309B717B0092266C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BC5B1029309A276A0092266C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BC5B1030309A276A0092266C;
+			remoteInfo = AllMight;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		BC5B1031309A276A0092266C /* AllMight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AllMight.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC5B109D309B717A0092266C /* AllMightTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AllMightTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +32,24 @@
 			path = AllMight;
 			sourceTree = "<group>";
 		};
+		BC5B109E309B717B0092266C /* AllMightTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AllMightTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		BC5B102E309A276A0092266C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC5B1096309B71160092266C /* VBTCore in Frameworks */,
+				BC5B1098309B71160092266C /* VBTVision in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BC5B109A309B717A0092266C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +63,7 @@
 			isa = PBXGroup;
 			children = (
 				BC5B1033309A276A0092266C /* AllMight */,
+				BC5B109E309B717B0092266C /* AllMightTests */,
 				BC5B1032309A276A0092266C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				BC5B1031309A276A0092266C /* AllMight.app */,
+				BC5B109D309B717A0092266C /* AllMightTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -65,10 +97,35 @@
 			);
 			name = AllMight;
 			packageProductDependencies = (
+				BC5B1095309B71160092266C /* VBTCore */,
+				BC5B1097309B71160092266C /* VBTVision */,
 			);
 			productName = AllMight;
 			productReference = BC5B1031309A276A0092266C /* AllMight.app */;
 			productType = "com.apple.product-type.application";
+		};
+		BC5B109C309B717A0092266C /* AllMightTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BC5B10A3309B717B0092266C /* Build configuration list for PBXNativeTarget "AllMightTests" */;
+			buildPhases = (
+				BC5B1099309B717A0092266C /* Sources */,
+				BC5B109A309B717A0092266C /* Frameworks */,
+				BC5B109B309B717A0092266C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BC5B10A2309B717B0092266C /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				BC5B109E309B717B0092266C /* AllMightTests */,
+			);
+			name = AllMightTests;
+			packageProductDependencies = (
+			);
+			productName = AllMightTests;
+			productReference = BC5B109D309B717A0092266C /* AllMightTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -83,6 +140,10 @@
 					BC5B1030309A276A0092266C = {
 						CreatedOnToolsVersion = 26.6;
 					};
+					BC5B109C309B717A0092266C = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = BC5B1030309A276A0092266C;
+					};
 				};
 			};
 			buildConfigurationList = BC5B102C309A276A0092266C /* Build configuration list for PBXProject "AllMight" */;
@@ -94,18 +155,29 @@
 			);
 			mainGroup = BC5B1028309A276A0092266C;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BC5B1094309B71160092266C /* XCLocalSwiftPackageReference "Packages/VBTKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BC5B1032309A276A0092266C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				BC5B1030309A276A0092266C /* AllMight */,
+				BC5B109C309B717A0092266C /* AllMightTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		BC5B102F309A276A0092266C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BC5B109B309B717A0092266C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +194,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BC5B1099309B717A0092266C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BC5B10A2309B717B0092266C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BC5B1030309A276A0092266C /* AllMight */;
+			targetProxy = BC5B10A1309B717B0092266C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		BC5B103A309A276D0092266C /* Debug */ = {
@@ -186,6 +273,7 @@
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
@@ -242,6 +330,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 6.0;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -261,19 +350,20 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.k0606.AllMight;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kun0606.AllMight;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -293,20 +383,63 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.k0606.AllMight;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kun0606.AllMight;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		BC5B10A4309B717B0092266C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QQ5995JYJH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.k0606.AllMightTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AllMight.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AllMight";
+			};
+			name = Debug;
+		};
+		BC5B10A5309B717B0092266C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QQ5995JYJH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.k0606.AllMightTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AllMight.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AllMight";
 			};
 			name = Release;
 		};
@@ -331,7 +464,34 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		BC5B10A3309B717B0092266C /* Build configuration list for PBXNativeTarget "AllMightTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BC5B10A4309B717B0092266C /* Debug */,
+				BC5B10A5309B717B0092266C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		BC5B1094309B71160092266C /* XCLocalSwiftPackageReference "Packages/VBTKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/VBTKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BC5B1095309B71160092266C /* VBTCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = VBTCore;
+		};
+		BC5B1097309B71160092266C /* VBTVision */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = VBTVision;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BC5B1029309A276A0092266C /* Project object */;
 }
