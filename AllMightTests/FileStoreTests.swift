@@ -22,4 +22,21 @@ struct FileStoreTests {
         try store.delete(.videos, fileName: fileName)
         #expect(!FileManager.default.fileExists(atPath: stored.path))
     }
+
+    @Test("moveIn 把來源檔搬進 Videos 並移除來源")
+    func movesVideoIn() throws {
+        let store = FileStore()
+
+        let source = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("mov")
+        try Data([0x00, 0x01, 0x02]).write(to: source)
+
+        let fileName = UUID().uuidString + ".mov"
+        let stored = try store.moveIn(.videos, sourceURL: source, fileName: fileName)
+        defer { try? store.delete(.videos, fileName: fileName) }
+
+        #expect(FileManager.default.fileExists(atPath: stored.path))
+        #expect(!FileManager.default.fileExists(atPath: source.path))
+    }
 }

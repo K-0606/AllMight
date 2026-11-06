@@ -8,6 +8,8 @@ struct TimelineStrip: View {
     let thumbnails: [CGImage]
     let startFraction: Double
     let endFraction: Double
+    /// 影片總長度（秒），用來把把手比例換算成 VoiceOver 報讀的時間。
+    let duration: Double
     /// VoiceOver 微調用的步進（秒÷總長換成比例）。
     let adjustStep: Double
     let onChangeStart: (Double) -> Void
@@ -35,14 +37,14 @@ struct TimelineStrip: View {
                     .frame(width: max(0, endX - startX))
                     .offset(x: startX)
 
-                handle(label: "片段起點", valueSeconds: startFraction)
+                handle(label: "片段起點", fraction: startFraction)
                     .offset(x: startX - handleWidth / 2)
                     .gesture(dragGesture(width: width, isStart: true))
                     .accessibilityAdjustableAction { direction in
                         adjust(isStart: true, direction: direction)
                     }
 
-                handle(label: "片段終點", valueSeconds: endFraction)
+                handle(label: "片段終點", fraction: endFraction)
                     .offset(x: endX - handleWidth / 2)
                     .gesture(dragGesture(width: width, isStart: false))
                     .accessibilityAdjustableAction { direction in
@@ -70,7 +72,7 @@ struct TimelineStrip: View {
         .frame(width: width)
     }
 
-    private func handle(label: LocalizedStringKey, valueSeconds: Double) -> some View {
+    private func handle(label: LocalizedStringKey, fraction: Double) -> some View {
         RoundedRectangle(cornerRadius: 4)
             .fill(Theme.Color.accent)
             .frame(width: handleWidth)
@@ -81,6 +83,7 @@ struct TimelineStrip: View {
             )
             .accessibilityElement()
             .accessibilityLabel(label)
+            .accessibilityValue(Text(Formatters.timecode(fraction * duration)))
     }
 
     private func dragGesture(width: CGFloat, isStart: Bool) -> some Gesture {
@@ -99,4 +102,20 @@ struct TimelineStrip: View {
             onChangeEnd(min(max(endFraction + delta, 0), 1))
         }
     }
+}
+
+#Preview {
+    TimelineStrip(
+        thumbnails: [],
+        startFraction: 0.2,
+        endFraction: 0.7,
+        duration: 12,
+        adjustStep: 1.0 / 12,
+        onChangeStart: { _ in },
+        onChangeEnd: { _ in }
+    )
+    .frame(height: 64)
+    .padding()
+    .background(Theme.Color.background)
+    .preferredColorScheme(.dark)
 }

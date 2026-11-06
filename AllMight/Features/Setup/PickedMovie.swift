@@ -15,7 +15,12 @@ struct PickedMovie: Transferable {
             let destination = FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString)
                 .appendingPathExtension(ext)
-            try FileManager.default.copyItem(at: received.file, to: destination)
+            // 盡量用搬移避免整檔複製；跨 volume 無法搬移時回退為複製。
+            do {
+                try FileManager.default.moveItem(at: received.file, to: destination)
+            } catch {
+                try FileManager.default.copyItem(at: received.file, to: destination)
+            }
             return PickedMovie(url: destination)
         }
     }

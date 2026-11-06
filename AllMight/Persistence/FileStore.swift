@@ -21,7 +21,7 @@ nonisolated struct FileStore: Sendable {
     }
 
     /// 無儲存狀態；直接使用執行緒安全的 `FileManager.default`，讓此型別可從任何 context 呼叫。
-    public init() {}
+    init() {}
 
     /// 回傳指定類別的目錄，不存在時建立。
     func directory(for kind: Kind) throws -> URL {
@@ -42,6 +42,31 @@ nonisolated struct FileStore: Sendable {
     /// 由檔名組出完整 URL（會確保目錄存在）。
     func url(for kind: Kind, fileName: String) throws -> URL {
         try directory(for: kind).appendingPathComponent(fileName, isDirectory: false)
+    }
+
+    /// 把來源檔複製進指定類別的目錄，回傳目的地 URL。目的地已存在時先刪除再複製。
+    @discardableResult
+    func store(_ kind: Kind, sourceURL: URL, fileName: String) throws -> URL {
+        let destination = try url(for: kind, fileName: fileName)
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.removeItem(at: destination)
+        }
+        try fileManager.copyItem(at: sourceURL, to: destination)
+        return destination
+    }
+
+    /// 把來源檔搬移進指定類別的目錄，回傳目的地 URL。來源與目的在同一容器時幾乎是即時的
+    /// （避免整檔重複複製）；用於把暫存檔收進 App 目錄。目的地已存在時先刪除。
+    @discardableResult
+    func moveIn(_ kind: Kind, sourceURL: URL, fileName: String) throws -> URL {
+        let destination = try url(for: kind, fileName: fileName)
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.removeItem(at: destination)
+        }
+        try fileManager.moveItem(at: sourceURL, to: destination)
+        return destination
     }
 
     /// 刪除單一檔案；檔案不存在時當作成功（不丟錯）。

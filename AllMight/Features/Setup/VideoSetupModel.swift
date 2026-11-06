@@ -49,11 +49,9 @@ final class VideoSetupModel {
         loadKg = savedLoad.map { Self.clampLoad($0) } ?? 20.0
         useStandardDiameter = defaults.object(forKey: Key.useStandardDiameter) as? Bool ?? true
         let savedDiameter = defaults.object(forKey: Key.customDiameterCm) as? Double
-        customDiameterCm = savedDiameter.map { Self.clampDiameter($0) } ?? standardFallbackDiameter
+        // 自訂直徑第一次的預設用標準值（落在範圍內）。
+        customDiameterCm = savedDiameter.map { Self.clampDiameter($0) } ?? Self.clampDiameter(Self.standardDiameterCm)
     }
-
-    /// 自訂直徑第一次的預設落在範圍內（用標準值）。
-    private var standardFallbackDiameter: Double { Self.clampDiameter(Self.standardDiameterCm) }
 
     /// 把目前的值寫回 UserDefaults（在使用者進入下一步時呼叫）。
     func persist() {

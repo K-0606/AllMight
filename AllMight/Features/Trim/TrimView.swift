@@ -23,7 +23,7 @@ struct TrimView: View {
                     .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
 
                 if model.clip.info.isLowFrameRate {
-                    Text("建議用 60fps 錄影，速度會更準。")
+                    Text("建議用 60fps 錄影，速度會更準")
                         .font(.footnote)
                         .foregroundStyle(Theme.Color.warning)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -43,6 +43,7 @@ struct TrimView: View {
                     thumbnails: model.thumbnails,
                     startFraction: model.startFraction,
                     endFraction: model.endFraction,
+                    duration: model.duration,
                     adjustStep: model.duration > 0 ? 1.0 / model.duration : 0.05,
                     onChangeStart: { model.updateStart(fraction: $0) },
                     onChangeEnd: { model.updateEnd(fraction: $0) }

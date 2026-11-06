@@ -19,31 +19,46 @@ struct HomeView: View {
     }
 }
 
-/// 「訓練」分頁入口：影片分析大卡片與「拍攝建議」次要入口。按鈕的目的地在 M1 接上。
+/// 「訓練」分頁的導覽路由。
+enum TrainingRoute: Hashable {
+    case setup
+    case trim(VideoClip)
+}
+
+/// 「訓練」分頁入口：影片分析大卡片與「拍攝建議」次要入口。
+/// 點影片分析 → 影片設定 → 剪輯（「拍攝建議」頁在 M7 接上）。
 private struct TrainingTab: View {
+    @State private var path: [TrainingRoute] = []
+    @State private var setupModel = VideoSetupModel()
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack {
                 Theme.Color.background.ignoresSafeArea()
 
                 VStack(spacing: Theme.Space.l) {
-                    VStack(alignment: .leading, spacing: Theme.Space.m) {
-                        Image(systemName: "video.badge.plus")
-                            .font(.largeTitle)
-                            .foregroundStyle(Theme.Color.accent)
-                        Text("影片分析")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(Theme.Color.textPrimary)
-                        Text("匯入已錄好的影片進行分析")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.Color.textSecondary)
+                    Button {
+                        path.append(.setup)
+                    } label: {
+                        VStack(alignment: .leading, spacing: Theme.Space.m) {
+                            Image(systemName: "video.badge.plus")
+                                .font(.largeTitle)
+                                .foregroundStyle(Theme.Color.accent)
+                            Text("影片分析")
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(Theme.Color.textPrimary)
+                            Text("匯入已錄好的影片進行分析")
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.Color.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(Theme.Space.xl)
+                        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(Theme.Space.xl)
-                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+                    .buttonStyle(.plain)
 
                     Button {
-                        // M1：導向影片設定頁。
+                        // M7：導向拍攝建議頁。
                     } label: {
                         Text("拍攝建議")
                             .font(.subheadline.weight(.medium))
@@ -55,6 +70,16 @@ private struct TrainingTab: View {
                 .padding(Theme.Space.l)
             }
             .navigationTitle("訓練")
+            .navigationDestination(for: TrainingRoute.self) { route in
+                switch route {
+                case .setup:
+                    VideoSetupView(model: setupModel) { clip in
+                        path.append(.trim(clip))
+                    }
+                case .trim(let clip):
+                    TrimView(clip: clip)
+                }
+            }
         }
     }
 }

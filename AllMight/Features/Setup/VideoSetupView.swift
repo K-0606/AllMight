@@ -1,11 +1,12 @@
 import SwiftUI
 import PhotosUI
+import os
 import VBTCore
 import VBTVision
 
 /// 影片設定頁：選動作、重量（kg）、槓片直徑，然後用 PhotosPicker 選影片。
 ///
-/// 選到影片後複製到 Application Support/Videos/ 並檢查；通過才呼叫 `onReady` 進入剪輯。
+/// 選到影片後檢查，通過才搬進 Application Support/Videos/ 並呼叫 `onReady` 進入剪輯。
 struct VideoSetupView: View {
     @Bindable var model: VideoSetupModel
     /// 影片通過檢查後回傳可剪輯的片段。
@@ -14,8 +15,10 @@ struct VideoSetupView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var isLoading = false
     @State private var errorMessage: LocalizedStringKey?
+    @FocusState private var loadFieldFocused: Bool
 
     private let fileStore = FileStore()
+    private static let logger = Logger(subsystem: "com.kun0606.AllMight", category: "VideoImport")
 
     var body: some View {
         ZStack {
@@ -29,6 +32,17 @@ struct VideoSetupView: View {
             }
             .scrollContentBackground(.hidden)
             .disabled(isLoading)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") { loadFieldFocused = false }
+                }
+            }
+            .onChange(of: loadFieldFocused) { _, focused in
+                if !focused {
+                    model.loadKg = VideoSetupModel.clampLoad(model.loadKg)
+                }
+            }
 
             if isLoading {
                 loadingOverlay
@@ -57,16 +71,31 @@ struct VideoSetupView: View {
 
     private var loadSection: some View {
         Section {
-            Stepper(
-                value: $model.loadKg,
-                in: VideoSetupModel.minLoadKg...VideoSetupModel.maxLoadKg,
-                step: VideoSetupModel.loadStepKg
-            ) {
-                LabeledContent("重量") {
-                    Text(Formatters.weightKg(model.loadKg))
+            HStack(spacing: Theme.Space.m) {
+                // 整個「重量 … kg」區域都可點擊叫出鍵盤，不用只點數字。
+                HStack(spacing: Theme.Space.s) {
+                    Text("重量")
+                    Spacer(minLength: Theme.Space.m)
+                    TextField("重量", value: $model.loadKg, format: .number.precision(.fractionLength(0...1)))
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
                         .monospacedDigit()
+                        .focused($loadFieldFocused)
+                        .fixedSize()
+                    Text("kg")
                         .foregroundStyle(Theme.Color.textSecondary)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { loadFieldFocused = true }
+
+                Stepper(
+                    "重量",
+                    value: $model.loadKg,
+                    in: VideoSetupModel.minLoadKg...VideoSetupModel.maxLoadKg,
+                    step: VideoSetupModel.loadStepKg
+                )
+                .labelsHidden()
+                .fixedSize()
             }
         }
         .listRowBackground(Theme.Color.surface)
@@ -100,13 +129,9 @@ struct VideoSetupView: View {
 
     private var pickerSection: some View {
         Section {
-            PhotosPicker(selection: $photoItem, matching: .videos) {
-                Text("選擇影片")
-                    .font(.headline)
-                    .foregroundStyle(Theme.Color.background)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Theme.Space.m)
-                    .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.button))
+            // .current：盡量用原始編碼、避免把 HDR/Dolby Vision 轉碼成 SDR（見 DECISIONS D-018）。
+            PhotosPicker(selection: $photoItem, matching: .videos, preferredItemEncoding: .current) {
+                SelectVideoButtonLabel()
             }
             .listRowInsets(EdgeInsets(top: Theme.Space.s, leading: Theme.Space.l, bottom: Theme.Space.s, trailing: Theme.Space.l))
             .listRowBackground(Color.clear)
@@ -145,20 +170,28 @@ struct VideoSetupView: View {
             photoItem = nil
         }
         do {
+            let startedAt = Date()
             guard let movie = try await item.loadTransferable(type: PickedMovie.self) else {
                 errorMessage = Self.message(for: .videoUnreadable)
                 return
             }
+            let afterTransfer = Date()
             let tempURL = movie.url
-            defer { try? FileManager.default.removeItem(at: tempURL) }
-
-            // 先檢查，通過才複製進 Videos，避免留下不合規的檔案。
-            let info = try await VideoInspector.inspect(url: tempURL)
-            let fileName = UUID().uuidString + "." + (tempURL.pathExtension.isEmpty ? "mov" : tempURL.pathExtension)
-            let storedURL = try fileStore.store(.videos, sourceURL: tempURL, fileName: fileName)
-
-            model.persist()
-            onReady(VideoClip(url: storedURL, info: info))
+            do {
+                // 先檢查，通過才把暫存檔搬進 Videos：避免留下不合規的檔案，也省掉一次整檔複製。
+                let info = try await VideoInspector.inspect(url: tempURL)
+                let afterInspect = Date()
+                let fileName = UUID().uuidString + "." + (tempURL.pathExtension.isEmpty ? "mov" : tempURL.pathExtension)
+                let storedURL = try fileStore.moveIn(.videos, sourceURL: tempURL, fileName: fileName)
+                let afterStore = Date()
+                Self.logger.info("影片載入耗時（秒）transfer=\(afterTransfer.timeIntervalSince(startedAt), privacy: .public) inspect=\(afterInspect.timeIntervalSince(afterTransfer), privacy: .public) store=\(afterStore.timeIntervalSince(afterInspect), privacy: .public)")
+                Self.logger.info("影片資訊 codec=\(info.codec, privacy: .public) hdr=\(info.isHDR, privacy: .public) 解析度=\(info.geometry.widthPx, privacy: .public)x\(info.geometry.heightPx, privacy: .public) fps=\(info.geometry.nominalFPS, privacy: .public) 方向=\(String(describing: info.orientation), privacy: .public) 長度秒=\(info.durationSeconds, privacy: .public) 低影格率=\(info.isLowFrameRate, privacy: .public)")
+                model.persist()
+                onReady(VideoClip(url: storedURL, info: info))
+            } catch {
+                try? FileManager.default.removeItem(at: tempURL)
+                throw error
+            }
         } catch let error as AnalysisError {
             errorMessage = Self.message(for: error)
         } catch {
@@ -180,6 +213,19 @@ struct VideoSetupView: View {
         case .videoUnreadable, .trackingLost, .noRepsDetected, .cancelled:
             "無法讀取這段影片，請換一段再試。"
         }
+    }
+}
+
+/// 「選擇影片」主按鈕外觀。獨立成型別，避免在 PhotosPicker 的 Sendable label 閉包裡
+/// 直接參照 MainActor 隔離的 Theme token。
+private struct SelectVideoButtonLabel: View {
+    var body: some View {
+        Text("選擇影片")
+            .font(.headline)
+            .foregroundStyle(Theme.Color.background)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Space.m)
+            .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.button))
     }
 }
 
