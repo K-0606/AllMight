@@ -21,11 +21,11 @@
 **狀態（2026-11-04）**：Bundle ID `com.kun0606.AllMight`、最低部署 iOS 17.6、Swift Language Version 6（專案與兩個 target）。`swift test` 2/2；`xcodebuild … test`（iPhone 17）`** TEST SUCCEEDED **`（App 1/1）。Swift 6 嚴格並行檢查促使 `FileStore` 改為 `nonisolated` 無狀態型別（見 DECISIONS D-011）。M0 完成。
 
 ## M1 影片設定、匯入與剪輯
-- [ ] `VideoSetupView`（動作、重量、槓片直徑；記住上次值）
-- [ ] PhotosPicker 選影片、複製到 Application Support/Videos
-- [ ] `VideoInspector`：時長、fps、轉正尺寸、方向、慢動作偵測 + 單元測試
-- [ ] `TrimView`：播放器 + 縮圖時間軸 + 起訖把手，限制 1–60 秒
-**驗收**：直拍、橫拍影片都能正確顯示方向；不合規影片顯示 PRD 的錯誤文字。
+- [x] `VideoSetupView`（動作、重量、槓片直徑；記住上次值）— `VideoSetupModel` 以 UserDefaults 記住上次值並夾範圍；App 測試 4/4
+- [x] PhotosPicker 選影片、複製到 Application Support/Videos — 先檢查再複製（通過才留檔）；`FileStore.store` + 測試；不合規顯示 PRD §3.3 錯誤文字
+- [x] `VideoInspector`：時長、fps、轉正尺寸、方向、慢動作偵測 + 單元測試 — `swift test` 22/22（含 AVAssetWriter 合成影片橫拍/直拍整合測試）；慢動作的真實相簿影片格式需使用者實機驗證
+- [x] `TrimView`：播放器 + 縮圖時間軸 + 起訖把手，限制 1–60 秒 — `TimelineStrip` 把手拖曳＋VoiceOver 微調；`TrimModel` 維持 1–60 秒限制
+**驗收**：直拍、橫拍影片都能正確顯示方向；不合規影片顯示 PRD 的錯誤文字。建置通過、`swift test` 23/23、App 測試 6/6。需使用者實機驗證：(a) 真實慢動作影片是否被正確阻擋；(b) 前鏡頭鏡像影片方向（`VideoOrientation` 鏡像分支目前僅內部自洽，未對真實影片確認，M2 FrameReader 接上前勿當成已確認）。
 
 ## M2 點選槓片與追蹤
 - [ ] `PlateSelectView`：顯示起點幀、點擊出圓圈、拖曳與縮放、座標轉 Vision 正規化

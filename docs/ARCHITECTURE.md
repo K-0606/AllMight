@@ -136,8 +136,9 @@ Features/
 
 ## 6. 錯誤
 ```swift
-public enum AnalysisError: Error, Sendable {
+public enum AnalysisError: Error, Sendable, Equatable {
     case videoUnreadable, unsupportedSlowMotion, frameRateTooLow(Double)
+    case videoTooShort(seconds: Double), videoTooLong(seconds: Double)   // PRD §3.3 長度限制（D-015）
     case trackingLost(atTime: Double), noRepsDetected, cancelled
 }
 ```
