@@ -123,6 +123,13 @@
 - 原因：真實影片的 `PlateSelection`（點選圓心）需透過 App UI 才取得，難以手寫 sidecar；追蹤準確度本來就需實機（模擬器 HDR 偏色、無法判斷，D-019）。回答了 OPEN_QUESTIONS Q6、Q7。
 - 替代：要求使用者手寫 sidecar 預期值（不便，未採用）。
 
+## D-025 在 M3 之前插入「追蹤驗證」步驟（TrackingRunner + 疊點重播 + log）
+- 2026-11-07 · 已決定（使用者）
+- 決定：先讓使用者能在**真實影片**上目視確認追蹤正確，再投入速度計算。新增 `TrackingRunner`（VBTVision `actor`，串 `FrameReader → PlateTracker` 產生 `[TrackSample]`，`os.Logger` category `Tracking` 記參數/每幀 center·信心·缺漏/結尾摘要與跟丟時間；跟丟不丟錯而回傳 `TrackingRun.lostAtTime`）；App 新增追蹤預覽頁（`TrackingPreviewView` 重播剪好片段、紅點跟槓片、畫整條軌跡線、狀態列），「鎖定並追蹤」接進此頁。`PlateSelection` 加 `Hashable` 供導覽路由。
+- 原因：使用者正確指出「先確認追蹤對、再算才有意義」。原 ROADMAP 疊圖重播排在 V1.2，但那是成品功能；此為開發期驗證工具，且 `TrackingRunner` 正是 M4 `AnalysisPipeline` 的追蹤段，不浪費。
+- 影響：追蹤技術為 Apple Vision `VNTrackObjectRequest`（通用物件追蹤，不看顏色、非槓片專用偵測），真實影片準確度仍需實機驗證（Q10）。追蹤框 vs 使用者圓圈的 25% 比例尺差異警告（ALGORITHMS §1）尚未納入 log，留待 M4。
+- 替代：直接做 M3、追蹤可視化等 M5 結果頁（使用者否決，因無法及早驗證追蹤）。
+
 ## D-020 匯入時記錄載入耗時與影片資訊（os.Logger）；VideoInfo 增加 codec/isHDR
 - 2026-11-07 · 已決定（使用者）
 - 決定：`VideoSetupView.handlePicked` 用 `os.Logger`（subsystem `com.kun0606.AllMight`、category `VideoImport`）記兩行：(1) 載入各階段耗時 `transfer / inspect / store`（秒）；(2) 影片資訊 `codec、hdr、解析度、fps、方向、長度、低影格率`。方便日後查資訊與抓 bug（例如這次的 HDR 問題）。

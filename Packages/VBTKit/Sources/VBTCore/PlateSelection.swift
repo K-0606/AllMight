@@ -5,7 +5,7 @@ import Foundation
 /// 圓心以 **Vision 正規化座標**表示（0–1，原點左下，轉正後影像）；
 /// 直徑以轉正後影像的像素表示，作為比例尺來源（見 docs/ALGORITHMS.md §1）。
 /// 比例尺只用此圓圈，不用追蹤框大小（追蹤框只做 25% 差異警告）。
-public struct PlateSelection: Codable, Sendable, Equatable {
+public struct PlateSelection: Codable, Sendable, Equatable, Hashable {
     /// 圓心 x，Vision 正規化（0–1，原點左下）。
     public var centerX: Double
     /// 圓心 y，Vision 正規化（0–1，原點左下）。

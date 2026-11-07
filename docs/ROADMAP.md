@@ -33,7 +33,12 @@
 - [x] `PlateTracker`（VNTrackObjectRequest、遺失判斷）— 只用中心點（D-006）；信心/瞬移/框面積缺漏判斷；連續缺漏 > maxGapFrames → trackingLost
 - [x] 測試工具：產生合成「移動圓盤」影片（AVAssetWriter）— `SyntheticPlateVideo`（已知軌跡 + ground truth、`rotate90`、`occlusion`、全關鍵影格高位元率）
 - [x] 端對端測試：合成影片的追蹤軌跡誤差 < 2 px — 中等速度每幀 < 2 px、平均 < 1.5 px（Vision 底噪 ~0.9px，見 D-023）；直/橫拍一致 < 2 px；遮擋 → trackingLost
-**驗收**：合成影片測試通過（`swift test` 42/42、App 測試 12/12）。**需使用者實機驗證**：(a) 2+ 段真實影片點選槓片後追蹤沒跑掉；(b) 前鏡頭鏡像影片方向（D-019 相關，`VideoOrientation` 鏡像分支仍未對真實影片確認）；(c) 真實影片追蹤準確度（模擬器無法判斷，見 OPEN_QUESTIONS Q10）。
+**驗收**：合成影片測試通過（`swift test` 45/45、App 測試 14/14）。**需使用者實機驗證**：(a) 2+ 段真實影片點選槓片後追蹤沒跑掉；(b) 前鏡頭鏡像影片方向（D-019 相關，`VideoOrientation` 鏡像分支仍未對真實影片確認）；(c) 真實影片追蹤準確度（模擬器無法判斷，見 OPEN_QUESTIONS Q10）。
+
+## M2.5 追蹤驗證（M3 之前插入，見 DECISIONS D-025）
+- [x] `TrackingRunner`（VBTVision actor）：串 `FrameReader → PlateTracker` 產生 `[TrackSample]`，`os.Logger` 記參數/每幀/摘要；跟丟不丟錯而回傳 `lostAtTime`。合成影片測試 2 筆。M4 `AnalysisPipeline` 會重用。
+- [x] App 追蹤預覽：`TrackingPreviewModel` + `VideoLayerView`（AVPlayerLayer）+ `TrackingPreviewView`：重播剪好片段、紅點跟槓片、軌跡線、狀態列（樣本數/平均信心/是否跟丟）；「鎖定並追蹤」接進此頁。
+**目的**：讓使用者在**真實影片**上目視確認追蹤是否正確，再投入 M3 計算。**需使用者實機驗證**（同 Q10）。
 
 ## M3 速度計算（可與 M1/M2 平行）
 - [ ] `Calibrator`、缺漏內插、`Resampler`

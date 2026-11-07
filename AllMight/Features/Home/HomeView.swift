@@ -1,4 +1,5 @@
 import SwiftUI
+import VBTCore
 
 /// 首頁：兩個分頁「訓練」與「歷史」。
 /// M0 只放入口與空狀態；實際導覽（影片設定、剪輯、結果、歷史內容）在之後的里程碑接上。
@@ -24,6 +25,7 @@ enum TrainingRoute: Hashable {
     case setup
     case trim(VideoClip)
     case plateSelect(VideoClip, trimStartSeconds: Double, trimEndSeconds: Double)
+    case trackingPreview(VideoClip, trimStartSeconds: Double, trimEndSeconds: Double, selection: PlateSelection)
 }
 
 /// 「訓練」分頁入口：影片分析大卡片與「拍攝建議」次要入口。
@@ -86,10 +88,17 @@ private struct TrainingTab: View {
                         clip: clip,
                         trimStartSeconds: start,
                         trimEndSeconds: end,
-                        onLocked: { _ in
-                            // M4／M5：帶著 PlateSelection 進入分析管線與結果頁。
+                        onLocked: { selection in
+                            path.append(.trackingPreview(clip, trimStartSeconds: start, trimEndSeconds: end, selection: selection))
                         },
                         onReselect: { if !path.isEmpty { path.removeLast() } }
+                    )
+                case let .trackingPreview(clip, start, end, selection):
+                    TrackingPreviewView(
+                        clip: clip,
+                        trimStartSeconds: start,
+                        trimEndSeconds: end,
+                        selection: selection
                     )
                 }
             }

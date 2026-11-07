@@ -84,6 +84,7 @@ public struct SetAnalysis: Codable, Sendable {
 | `VideoInspector` | 讀時長、fps、轉正尺寸、方向、是否慢動作；回傳 `VideoInfo` 或錯誤 |
 | `FrameReader` | 拉取式 `next() throws -> Frame?`（非 `AsyncThrowingStream`，見 D-021），Frame = `CVPixelBuffer` + 時間 + 方向。只讀片段範圍、8-bit 輸出 |
 | `PlateTracker` | 包住 `VNTrackObjectRequest`；`track(frame) -> TrackSample?`；遺失判斷 |
+| `TrackingRunner` | `actor`。串 `FrameReader → PlateTracker` 產生 `[TrackSample]` 與 `TrackingRun`（含 `lostAtTime`）；`os.Logger` 追蹤 log。M4 `AnalysisPipeline` 的追蹤段（見 D-025） |
 | `AnalysisPipeline` | `actor`。串起 Reader → Tracker → VBTCore；`AsyncStream<AnalysisProgress>` 回報；支援取消 |
 
 做法見 skill `video-pipeline`、`plate-tracking`。
