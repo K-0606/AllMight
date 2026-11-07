@@ -28,12 +28,12 @@
 **驗收**：直拍、橫拍影片都能正確顯示方向；不合規影片顯示 PRD 的錯誤文字。建置通過、`swift test` 23/23、App 測試 6/6。需使用者實機驗證：(a) 真實慢動作影片是否被正確阻擋；(b) 前鏡頭鏡像影片方向（`VideoOrientation` 鏡像分支目前僅內部自洽，未對真實影片確認，M2 FrameReader 接上前勿當成已確認）。
 
 ## M2 點選槓片與追蹤
-- [ ] `PlateSelectView`：顯示起點幀、點擊出圓圈、拖曳與縮放、座標轉 Vision 正規化
-- [ ] `FrameReader`（片段範圍、逐幀、時間戳、方向）+ 測試
-- [ ] `PlateTracker`（VNTrackObjectRequest、遺失判斷）
-- [ ] 測試工具：產生合成「移動圓盤」影片（AVAssetWriter）
-- [ ] 端對端測試：合成影片的追蹤軌跡誤差 < 2 px
-**驗收**：合成影片測試通過；使用者用 2 段真實影片實機確認追蹤沒跑掉（需使用者驗證）。
+- [x] `PlateSelectView`：顯示起點幀、點擊出圓圈、拖曳與縮放、座標轉 Vision 正規化 — `PlateSelectModel` + `PlateCircleOverlay`；座標數學在 VBTCore（`PlateCoordinates`）附測試；App 測試含 5 筆換算/夾範圍測試
+- [x] `FrameReader`（片段範圍、逐幀、時間戳、方向）+ 測試 — 拉取式（非 AsyncThrowingStream，見 D-021）、8-bit 輸出；5 筆測試（幀數、時間戳遞增、片段範圍、直/橫拍方向）
+- [x] `PlateTracker`（VNTrackObjectRequest、遺失判斷）— 只用中心點（D-006）；信心/瞬移/框面積缺漏判斷；連續缺漏 > maxGapFrames → trackingLost
+- [x] 測試工具：產生合成「移動圓盤」影片（AVAssetWriter）— `SyntheticPlateVideo`（已知軌跡 + ground truth、`rotate90`、`occlusion`、全關鍵影格高位元率）
+- [x] 端對端測試：合成影片的追蹤軌跡誤差 < 2 px — 中等速度每幀 < 2 px、平均 < 1.5 px（Vision 底噪 ~0.9px，見 D-023）；直/橫拍一致 < 2 px；遮擋 → trackingLost
+**驗收**：合成影片測試通過（`swift test` 42/42、App 測試 12/12）。**需使用者實機驗證**：(a) 2+ 段真實影片點選槓片後追蹤沒跑掉；(b) 前鏡頭鏡像影片方向（D-019 相關，`VideoOrientation` 鏡像分支仍未對真實影片確認）；(c) 真實影片追蹤準確度（模擬器無法判斷，見 OPEN_QUESTIONS Q10）。
 
 ## M3 速度計算（可與 M1/M2 平行）
 - [ ] `Calibrator`、缺漏內插、`Resampler`

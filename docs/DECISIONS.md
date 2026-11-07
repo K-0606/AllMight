@@ -98,6 +98,31 @@
 - 決定：**不加 workaround**。HDR 的顏色/視覺一律以實機驗證；模擬器只用來測版面、流程、邏輯。純屬顯示問題，不影響像素資料；M2 追蹤用 `AVAssetReader` 逐幀解碼成 8-bit，且追蹤不看顏色，不受影響。
 - 備查：若開發期真的需要，可用 `#if targetEnvironment(simulator)` 只在模擬器把預覽 tone-map 成 SDR，實機不動——目前判斷不值得，未採用。
 
+## D-021 FrameReader 採拉取式 API，不用 AsyncThrowingStream
+- 2026-11-07 · 暫定（Agent，實作 M2 時決定）
+- 決定：`FrameReader` 是非 `Sendable` 的 `final class`，用同步的 `next() throws -> Frame?` 一次拉一幀，而非 ARCHITECTURE §3 原寫的 `AsyncThrowingStream<Frame>`。`Frame` 內保留來源 `CMSampleBuffer` 以固定 `CVPixelBuffer` 的記憶體生命週期（`alwaysCopiesSampleData = false`）。整個讀取器生命週期留在單一 context（未來的 `AnalysisPipeline` actor）內，`Frame` 不跨 actor 傳遞。
+- 原因：Swift 6 嚴格並行下，`CVPixelBuffer`/`Frame` 非 `Sendable`，用 `AsyncThrowingStream` 需 `@unchecked Sendable`（swift-style 禁止）或預先緩衝；而緩衝整段影片會記憶體爆量、丟幀政策會破壞逐幀分析。解碼本身同步，拉取式最貼合用途：有界記憶體、不丟幀、不需 Sendable hack。與 D-011 同精神（Swift 6 並行驅動的設計調整）。ARCHITECTURE §3 已同步更新。
+- 替代：`AsyncThrowingStream` + `alwaysCopiesSampleData = true` + `@unchecked Sendable`（違反 swift-style，且需緩衝權衡）。
+
+## D-022 新增 AnalysisParameters 與追蹤遺失門檻
+- 2026-11-07 · 暫定（Agent，實作 M2 時補）
+- 決定：在 VBTCore 建立 `AnalysisParameters`（ALGORITHMS §7 全部參數）供追蹤與後續 M3／M4 共用，並新增三個追蹤遺失門檻：`maxCenterJumpFactor = 0.5`（× 槓片直徑）、`maxAreaGrowthFactor = 2.0`、`minAreaShrinkFactor = 0.5`（數值取自 skill plate-tracking §3）。ALGORITHMS §7 已加對應列。同時新增 `TrackSample`、`PlateSelection` 兩個值型別（定義見 ARCHITECTURE §2）。
+- 原因：「所有可調整數值放進 AnalysisParameters」（vbtkit 規則）；§7 原本缺追蹤遺失門檻（規格缺口，非牴觸）。這些是追蹤階段參數，影響的是原始 `TrackSample` 的產生，改值需重新追蹤，與 `analysisVersion`（從既有樣本重算）無關，故**不**升版，維持 `analysisVersion = 1`。
+- 替代：門檻寫死在 `PlateTracker`（違反 no-magic-numbers 規則）。
+
+## D-023 合成影片追蹤準確度門檻：每幀 < 2 px、平均 < 1.5 px
+- 2026-11-07 · 已決定（使用者）
+- 決定：合成「移動圓盤」端對端測試，在近真實一下的中等運動速度（≈2 px/幀）斷言每幀中心誤差 < 2 px、平均 < 1.5 px；直/橫拍一致 < 2 px。skill accuracy-check §2 原寫「平均 < 1 px」改為「平均 < 1.5 px」。
+- 原因：量測發現 `VNTrackObjectRequest` 的框中心即使槓片**完全靜止**也有 ~0.9 px 固有偏差（dx≈−0.6、dy≈0.7），並隨速度略增（快速時每幀最大 ~3 px）；`bestShift = 0` 排除單純時間延遲。此為 Vision 追蹤器本身精度，非管線錯誤（翻轉／比例錯誤會是上百 px）。ROADMAP「每幀 < 2 px」在中等以下速度可達成；「平均 < 1 px」不可達。
+- 連帶：真實影片的追蹤準確度無法在模擬器判斷，列入 OPEN_QUESTIONS Q10 由實機驗證；若實機不足，再評估 plate-tracking §4 的強化手段（輪廓重定位／CoreML，需先問）。
+- 替代：保留 < 1 px 平均並加強追蹤器（超出 MVP，未採用）。
+
+## D-024 真實影片驗證策略：M2 以實機手動為主，合成影片為自動化關卡（回答 Q6、Q7）
+- 2026-11-07 · 已決定（使用者）
+- 決定：M2 的自動化測試只用合成影片當關卡；真實影片（`TestVideos/`，6 段，不 commit）由使用者在實機點選槓片、目視確認追蹤沒跑掉。測試會偵測 `TestVideos/` 旁的同名 `.json` sidecar（格式見 skill accuracy-check §3），有就跑真實影片端對端、沒有就跳過（目前 6 段都無 sidecar，故跳過）。實機型號：A18（HEVC + HDR 來源），Apple Developer Team `QQ5995JYJH`。
+- 原因：真實影片的 `PlateSelection`（點選圓心）需透過 App UI 才取得，難以手寫 sidecar；追蹤準確度本來就需實機（模擬器 HDR 偏色、無法判斷，D-019）。回答了 OPEN_QUESTIONS Q6、Q7。
+- 替代：要求使用者手寫 sidecar 預期值（不便，未採用）。
+
 ## D-020 匯入時記錄載入耗時與影片資訊（os.Logger）；VideoInfo 增加 codec/isHDR
 - 2026-11-07 · 已決定（使用者）
 - 決定：`VideoSetupView.handlePicked` 用 `os.Logger`（subsystem `com.kun0606.AllMight`、category `VideoImport`）記兩行：(1) 載入各階段耗時 `transfer / inspect / store`（秒）；(2) 影片資訊 `codec、hdr、解析度、fps、方向、長度、低影格率`。方便日後查資訊與抓 bug（例如這次的 HDR 問題）。

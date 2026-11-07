@@ -77,8 +77,14 @@ x_m[i] = (x[i] − x[0]) × widthPx  × scale     // 只用來畫軌跡
 | velThreshold | 0.05 m/s | 階段判斷門檻 |
 | minPhaseSeconds | 0.10 s | 階段最短持續時間 |
 | minROM | 0.10 m | 有效向心最小位移（各動作可覆寫，待實測） |
+| maxCenterJumpFactor | 0.5 | 追蹤：單幀中心跳動上限 = 此值 × 槓片直徑（px），超過視為缺漏（見 skill plate-tracking §3、DECISIONS D-022） |
+| maxAreaGrowthFactor | 2.0 | 追蹤：追蹤框面積相對初始框成長上限倍數，超過視為缺漏 |
+| minAreaShrinkFactor | 0.5 | 追蹤：追蹤框面積相對初始框縮小下限倍數，低於視為缺漏 |
+
+> 追蹤三項門檻影響「追蹤」階段（原始 `TrackSample` 產生之前）；改值需重新追蹤，與 `analysisVersion`（從既有樣本重算）無關，不觸發升版。
 
 ## 8. 測試要求
 - 合成訊號：用已知速度函數（例如半正弦向心 + 半正弦離心 × 3 下 + 停頓）產生位置，加上高斯雜訊 σ = 2 px，換回正規化座標後跑完整管線，斷言：次數正確、MV 誤差 < 0.02 m/s、ROM 誤差 < 1 cm。
 - 邊界：只有 1 下、沒有任何動作、片段從動作中間開始、最後放下槓鈴、缺漏剛好 = maxGapFrames 與 +1、30fps 與 60fps、變動影格率時間戳。
 - 端對端：測試中用 `AVAssetWriter` 產生「圓盤上下移動」的合成影片（已知軌跡），跑 Vision 追蹤 + 全管線。見 skill `accuracy-check`。
+- 追蹤準確度（M2 實測）：中等速度每幀中心誤差 < 2 px、平均 < 1.5 px；直/橫拍一致 < 2 px。`VNTrackObjectRequest` 框中心即使靜止也有 ~0.9 px 固有偏差，故平均門檻為 1.5 px 而非 1 px（見 DECISIONS D-023）。真實影片準確度待實機驗證（OPEN_QUESTIONS Q10）。

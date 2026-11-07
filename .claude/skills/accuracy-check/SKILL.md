@@ -18,8 +18,8 @@ description: Measure end-to-end tracking and velocity accuracy using a generated
 ## 2. 要跑的檢查
 | 測試 | 通過標準 |
 |---|---|
-| 追蹤中心誤差（無擋） | 每幀 < 2 px，平均 < 1 px |
-| 直拍版與橫拍版結果一致 | 中心座標差 < 1 px |
+| 追蹤中心誤差（無擋） | 每幀 < 2 px，平均 < 1.5 px（VNTrackObjectRequest 靜止即有 ~0.9px 底噪，見 DECISIONS D-023） |
+| 直拍版與橫拍版結果一致 | 中心座標差 < 2 px（同 D-023，旋轉版同受 Vision 底噪影響） |
 | 3 下全管線 | 次數 = 3；每下 MV 誤差 < 0.02 m/s；ROM 誤差 < 1 cm |
 | 30 fps 版 | 次數正確；MV 誤差 < 0.03 m/s |
 | 擋住 0.5 秒 | 丟出 `trackingLost`，時間在擋住區間內 |
