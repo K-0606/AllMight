@@ -7,9 +7,15 @@ import VBTVision
 /// 「完成」將在 M2 帶著片段進入「點選槓片」。
 struct TrimView: View {
     @State private var model: TrimModel
+    /// 「完成」後帶著片段起訖進入「點選槓片」。
+    var onContinue: (_ trimStartSeconds: Double, _ trimEndSeconds: Double) -> Void
 
-    init(clip: VideoClip) {
+    init(
+        clip: VideoClip,
+        onContinue: @escaping (_ trimStartSeconds: Double, _ trimEndSeconds: Double) -> Void
+    ) {
         _model = State(wrappedValue: TrimModel(clip: clip))
+        self.onContinue = onContinue
     }
 
     var body: some View {
@@ -59,7 +65,7 @@ struct TrimView: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("完成") {
-                    // M2：帶著片段起訖與 VideoClip 進入「點選槓片」。
+                    onContinue(model.trimStart, model.trimEnd)
                 }
             }
         }

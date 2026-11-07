@@ -23,6 +23,7 @@ struct HomeView: View {
 enum TrainingRoute: Hashable {
     case setup
     case trim(VideoClip)
+    case plateSelect(VideoClip, trimStartSeconds: Double, trimEndSeconds: Double)
 }
 
 /// 「訓練」分頁入口：影片分析大卡片與「拍攝建議」次要入口。
@@ -77,7 +78,19 @@ private struct TrainingTab: View {
                         path.append(.trim(clip))
                     }
                 case .trim(let clip):
-                    TrimView(clip: clip)
+                    TrimView(clip: clip) { start, end in
+                        path.append(.plateSelect(clip, trimStartSeconds: start, trimEndSeconds: end))
+                    }
+                case let .plateSelect(clip, start, end):
+                    PlateSelectView(
+                        clip: clip,
+                        trimStartSeconds: start,
+                        trimEndSeconds: end,
+                        onLocked: { _ in
+                            // M4／M5：帶著 PlateSelection 進入分析管線與結果頁。
+                        },
+                        onReselect: { if !path.isEmpty { path.removeLast() } }
+                    )
                 }
             }
         }
