@@ -12,12 +12,21 @@ public struct TrackingRun: Sendable {
     public var frameCount: Int
     /// 有效樣本的平均信心。
     public var meanConfidence: Double
+    /// 轉正後的影片幾何（尺寸與 nominalFPS），供後續運動學計算使用。
+    public var geometry: VideoGeometry
 
-    public init(samples: [TrackSample], lostAtTime: Double?, frameCount: Int, meanConfidence: Double) {
+    public init(
+        samples: [TrackSample],
+        lostAtTime: Double?,
+        frameCount: Int,
+        meanConfidence: Double,
+        geometry: VideoGeometry
+    ) {
         self.samples = samples
         self.lostAtTime = lostAtTime
         self.frameCount = frameCount
         self.meanConfidence = meanConfidence
+        self.geometry = geometry
     }
 }
 
@@ -31,12 +40,14 @@ public actor TrackingRunner {
 
     public init() {}
 
+    /// `onProgress`（選用）每讀一幀以估計的追蹤進度（0…1）回呼，供 `AnalysisPipeline` 轉成進度串流。
     public func run(
         url: URL,
         trimStartSeconds: Double,
         trimEndSeconds: Double,
         selection: PlateSelection,
-        parameters: AnalysisParameters = .standard
+        parameters: AnalysisParameters = .standard,
+        onProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> TrackingRun {
         Self.logger.info("追蹤開始 片段=\(trimStartSeconds, privacy: .public)…\(trimEndSeconds, privacy: .public)s 圓心=(\(selection.centerX, privacy: .public), \(selection.centerY, privacy: .public)) 直徑px=\(selection.diameterPx, privacy: .public) minConf=\(parameters.minConfidence, privacy: .public) maxGap=\(parameters.maxGapFrames, privacy: .public)")
 
@@ -49,6 +60,9 @@ public actor TrackingRunner {
 
         let tracker = PlateTracker(selection: selection, geometry: reader.geometry, parameters: parameters)
 
+        // 估計總幀數（片段長度 × fps），用來換算進度；實際幀數以 reader 為準，進度上限夾到 1。
+        let estimatedFrames = max(1.0, ((trimEndSeconds - trimStartSeconds) * reader.geometry.nominalFPS).rounded())
+
         var samples: [TrackSample] = []
         var confidenceSum = 0.0
         var frameCount = 0
@@ -58,6 +72,7 @@ public actor TrackingRunner {
             while let frame = try reader.next() {
                 try Task.checkCancellation()
                 frameCount += 1
+                onProgress?(min(1.0, Double(frameCount) / estimatedFrames))
                 if let sample = try tracker.track(frame) {
                     samples.append(sample)
                     confidenceSum += Double(sample.confidence)
@@ -83,7 +98,8 @@ public actor TrackingRunner {
             samples: samples,
             lostAtTime: lostAtTime,
             frameCount: frameCount,
-            meanConfidence: meanConfidence
+            meanConfidence: meanConfidence,
+            geometry: reader.geometry
         )
     }
 }
