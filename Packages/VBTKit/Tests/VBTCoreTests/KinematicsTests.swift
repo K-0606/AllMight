@@ -21,12 +21,17 @@ struct KinematicsTests {
         return best
     }
 
-    /// 檢查一組合成訊號跑完管線後，每下的 MV 與 ROM 都在容差內。
+    /// 檢查一組合成訊號跑完管線後，每下的 MV 與 ROM 都在 §8 容差內。
+    ///
+    /// MV < 0.02 m/s、ROM < 1 cm 是 ALGORITHMS §8 的驗收門檻（嚴格）。
+    /// PV 是雜訊敏感的 `max(v)`（§6）：σ=2px 時 60fps 約 +13%、30fps 約 +25%
+    /// （SG 導數在較大 dt 放大單點雜訊，也是推薦 60fps 的原因，D-016）。§8 未對 PV
+    /// 設界，這裡的 `pvTol` 只是寬鬆的正負號／量級合理性檢查，非驗收門檻。
     func assertAccuracy(
         result: SignalGenerator.Result,
         mvTol: Double = 0.02,
         romTol: Double = 0.01,
-        pvTol: Double = 0.05
+        pvTol: Double = 0.15
     ) throws {
         let series = try Kinematics.computeSeries(
             samples: result.samples,
@@ -79,50 +84,72 @@ struct KinematicsTests {
         try assertAccuracy(result: r)
     }
 
-    @Test("變動影格率（抖動時間戳）重取樣後仍在容差內")
-    func variableFrameRate() throws {
-        // 以 60fps 產生，再抖動時間戳模擬變動影格率（±30% 間隔），重取樣應吸收。
+    @Test("內部缺漏（= maxGapFrames）經內插後 MV/ROM 仍達標")
+    func gapInterpolationEndToEnd() throws {
         var r = SignalGenerator.generate(
             reps: 3, concentricDuration: 0.5, eccentricDuration: 0.6, peakVelocity: 0.4,
             pauseDuration: 0.4, fps: 60, geometry: geometry, selection: selection,
-            plateDiameterCm: plateDiameterCm, noiseSigmaPx: 2, seed: 999
+            plateDiameterCm: plateDiameterCm, noiseSigmaPx: 2, seed: 321
         )
-        var rng = SplitMix64(seed: 424242)
-        let base = 1.0 / 60
-        var t = 0.0
-        var jittered = r.samples
-        for i in 0..<jittered.count {
-            jittered[i].time = t
-            let jitter = base * (0.7 + 0.6 * rng.nextUnit()) // 0.7–1.3 倍間隔
-            t += jitter
+        // 把第一下向心中段連續 6 幀（= maxGapFrames）設為低信心（缺漏）。
+        for i in 30...35 { r.samples[i].confidence = 0.1 }
+        try assertAccuracy(result: r)
+    }
+
+    @Test("沒有任何動作：位置幾乎不動、速度接近 0、不崩潰")
+    func noMotion() throws {
+        let fps = 60.0
+        let n = 90
+        var rng = SplitMix64(seed: 7)
+        let noiseNormY = 2.0 / 1920
+        let samples = (0..<n).map { i in
+            TrackSample(time: Double(i) / fps, x: 0.5, y: 0.3 + rng.nextGaussian() * noiseNormY, confidence: 0.9)
         }
-        r.samples = jittered
-        // 時間軸被拉伸，重算每下的時間（以抖動後的時間重新對齊起訖樣本索引）。
-        // 用索引對應：合成時第 i 個樣本對應第 i 個抖動時間。
-        // 直接用管線輸出的網格與位置斷言 ROM（與時間軸無關），MV 用管線網格時間。
         let series = try Kinematics.computeSeries(
-            samples: r.samples, selection: r.selection, geometry: r.geometry,
-            plateDiameterCm: r.plateDiameterCm, parameters: .standard
+            samples: samples, selection: selection, geometry: geometry,
+            plateDiameterCm: plateDiameterCm, parameters: .standard
         )
-        // ROM 不依賴絕對時間，檢查管線能偵測到 3 段幅度接近 0.127 m 的上升。
-        let expectedROM = 2 * 0.4 * 0.5 / Double.pi
-        // 掃描速度，找出顯著正向段的位移。
-        var roms: [Double] = []
-        var i = 0
-        let n = series.velocity.count
-        while i < n {
-            if series.velocity[i] > 0.05 {
-                let start = i
-                while i < n && series.velocity[i] > 0.05 { i += 1 }
-                let end = min(i, n - 1)
-                roms.append(series.position[end] - series.position[start])
-            } else {
-                i += 1
-            }
+        let span = (series.position.max() ?? 0) - (series.position.min() ?? 0)
+        #expect(span < 0.02, "靜止時位置帶寬 \(span) m 應很小")
+        // 靜止時的速度只剩追蹤雜訊；應低於階段判斷門檻 velThreshold，M4 才不會誤判成動作。
+        let meanAbsV = series.velocity.map { abs($0) }.reduce(0, +) / Double(series.velocity.count)
+        #expect(meanAbsV < AnalysisParameters.standard.velThreshold, "靜止時平均速度 \(meanAbsV) m/s 應低於門檻")
+    }
+
+    @Test("空輸入回傳空序列、不丟錯")
+    func emptyInput() throws {
+        let series = try Kinematics.computeSeries(
+            samples: [], selection: selection, geometry: geometry,
+            plateDiameterCm: plateDiameterCm, parameters: .standard
+        )
+        #expect(series.time.isEmpty)
+        #expect(series.velocity.isEmpty)
+    }
+
+    @Test("整段都低於 minConfidence 時丟 trackingLost")
+    func allBelowConfidence() {
+        let fps = 60.0
+        let samples = (0..<30).map { i in
+            TrackSample(time: Double(i) / fps, x: 0.5, y: 0.3, confidence: 0.1)
         }
-        #expect(roms.count == 3, "偵測到的向心段數 \(roms.count)")
-        for rom in roms {
-            #expect(abs(rom - expectedROM) < 0.01, "ROM \(rom) vs \(expectedROM)")
+        #expect(throws: AnalysisError.self) {
+            try Kinematics.computeSeries(
+                samples: samples, selection: selection, geometry: geometry,
+                plateDiameterCm: plateDiameterCm, parameters: .standard
+            )
         }
+    }
+
+    @Test("變動影格率（±30% 間隔抖動）重取樣後仍在容差內")
+    func variableFrameRate() throws {
+        // 以 timeJitter=0.3 產生非等間隔時間戳，解析訊號在真實時間上取值；
+        // 管線的 Resampler 應把變動影格率吸收回等間隔網格。
+        let r = SignalGenerator.generate(
+            reps: 3, concentricDuration: 0.5, eccentricDuration: 0.6, peakVelocity: 0.4,
+            pauseDuration: 0.4, fps: 60, geometry: geometry, selection: selection,
+            plateDiameterCm: plateDiameterCm, noiseSigmaPx: 2, seed: 999,
+            timeJitter: 0.3, jitterSeed: 424242
+        )
+        try assertAccuracy(result: r)
     }
 }

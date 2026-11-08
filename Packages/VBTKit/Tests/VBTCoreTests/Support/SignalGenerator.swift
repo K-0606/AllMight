@@ -38,7 +38,9 @@ enum SignalGenerator {
         plateDiameterCm: Double,
         noiseSigmaPx: Double,
         seed: UInt64,
-        baseNormalizedY: Double = 0.3
+        baseNormalizedY: Double = 0.3,
+        timeJitter: Double = 0,
+        jitterSeed: UInt64 = 1
     ) -> Result {
         let Ve = Tc > 0 && Te > 0 ? Vc * Tc / Te : 0
 
@@ -95,12 +97,25 @@ enum SignalGenerator {
         let noiseNormY = noiseSigmaPx / Double(geometry.heightPx)
         let noiseNormX = noiseSigmaPx / Double(geometry.widthPx)
 
+        // 取樣時間：等間隔，或以 timeJitter 抖動間隔模擬變動影格率（間隔落在 [1−j, 1+j]/fps）。
+        var times: [Double] = []
+        if timeJitter <= 0 {
+            let count = Int((total * fps).rounded(.down)) + 1
+            times = (0..<count).map { Double($0) / fps }
+        } else {
+            var jr = SplitMix64(seed: jitterSeed)
+            var t = 0.0
+            while t <= total {
+                times.append(t)
+                let factor = 1 - timeJitter + 2 * timeJitter * jr.nextUnit()
+                t += factor / fps
+            }
+        }
+
         var rng = SplitMix64(seed: seed)
-        let count = Int((total * fps).rounded(.down)) + 1
         var samples: [TrackSample] = []
-        samples.reserveCapacity(count)
-        for i in 0..<count {
-            let t = Double(i) / fps
+        samples.reserveCapacity(times.count)
+        for t in times {
             let yN = baseNormalizedY + positionMeters(t) / metersPerNormY + rng.nextGaussian() * noiseNormY
             let xN = 0.5 + rng.nextGaussian() * noiseNormX
             samples.append(TrackSample(time: t, x: xN, y: yN, confidence: 0.95))
