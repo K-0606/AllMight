@@ -135,3 +135,14 @@
 - 決定：`VideoSetupView.handlePicked` 用 `os.Logger`（subsystem `com.kun0606.AllMight`、category `VideoImport`）記兩行：(1) 載入各階段耗時 `transfer / inspect / store`（秒）；(2) 影片資訊 `codec、hdr、解析度、fps、方向、長度、低影格率`。方便日後查資訊與抓 bug（例如這次的 HDR 問題）。
 - 連帶：`VideoInfo` 新增 `codec: String`（FourCC，如 "hvc1"/"avc1"）與 `isHDR: Bool`。codec 由 `CMFormatDescriptionGetMediaSubType` 取得；isHDR 由 `AVMediaCharacteristic.containsHDRVideo` 判斷（系統從 format description 推斷，比解析 transfer function 乾淨）。
 - 保留 log：使用者同意先留著計時與資訊 log（非 `print`，符合 swift-style 用 `os.Logger` 的規則），之後要拿掉再說。
+
+## D-026 M3 速度計算：管線型別與 ALGORITHMS §3 缺口的工程決定
+- 2026-11-08 · 暫定（Agent，實作 M3 時決定；經 algorithm-reviewer 審查）
+- 背景：M3 實作 `Calibrator`、`GapFiller`、`Resampler`、`SavitzkyGolay`、`Kinematics.computeSeries`，純 VBTCore。沒有改任何 §1–§4 公式或 §7 預設參數，故 `analysisVersion` 維持 1。以下是規格未明寫、由實作補齊的幾點：
+  1. **開頭/結尾缺漏的處理（§3 缺口）**：§3 只定義「連續缺漏 ≤ maxGapFrames 線性內插、超過 trackingLost」，但落在片段開頭或結尾的缺漏**沒有兩側有效點可內插**。決定：這類缺漏若 ≤ maxGapFrames 就**丟棄**那幾幀（等間隔網格晚一點開始／早一點結束），> maxGapFrames 仍丟 `trackingLost`。原因：開頭/結尾本就少數幀，丟棄不影響動作段；硬補值會引入假資料。
+  2. **原點取第一個樣本**：§2 寫 `y[0]` 為原點，實作即取 `samples.first`。原點是常數位移，不影響速度與 ROM（皆為相對量），即使首幀略有雜訊也只平移絕對位置。
+  3. **`Resampler` 浮點掉尾幀修正**：`span/dt` 剛好是整數時浮點可能算成 `k−ε`（如 0.3/0.1 = 2.999…），`floor` 會少一格而掉掉尾幀——正是 §8「最後放下槓鈴／從動作中間開始」會踩到的情境。改為 `floor(span/dt + 1e-9) + 1`，並強化 `ResamplerTests` 斷言尾端貼齊 `tEnd`。
+  4. **`KinematicSeries` 欄位**：除 ARCHITECTURE §2 列的時間/位置/速度外，另存**加速度**（§6 MPV 要找 `a < −9.81`，M4 用）、**水平位置**（§2「只用來畫軌跡」）與 **scale**（§1，供 M4 的 25% `scaleMismatch` 警告）。都在 M3 已可免費算出，先存免得 M4 重算。
+  5. **PV 不是 §8 的 M3 驗收門檻**：§8 只要求 MV < 0.02 m/s、ROM < 1 cm、次數正確。峰值速度 PV = `max(v)`（§6）對雜訊敏感：σ=2px 時 60fps 約 +13%、30fps 約 +25%（SG 導數在較大 dt 放大單點雜訊，也是 D-016 推薦 60fps 的原因）。測試對 PV 只做寬鬆 sanity 檢查（0.15 m/s），完整 PV／「次數」驗收待 M4 `RepSegmenter` 與 `AnalysisPipeline`。
+- 驗證：合成**訊號**（VBTCoreTests）與合成**影片→真實 Vision 追蹤**（VBTVisionTests `KinematicsVideoTests`）兩路端對端皆達 §8 門檻；`swift test` 79/79。
+- 替代：開頭/結尾缺漏改用最近有效值外插（會造假位移，未採用）；`KinematicSeries` 只存速度、M4 重算加速度（重複計算，未採用）。

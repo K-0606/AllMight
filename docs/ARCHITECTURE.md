@@ -71,7 +71,7 @@ public struct SetAnalysis: Codable, Sendable {
     public var parameters: AnalysisParameters
     public var reps: [RepMetrics]
     public var summary: SetSummary
-    public var series: KinematicSeries            // 等間隔的時間、位置、速度（給圖表用）
+    public var series: KinematicSeries            // 等間隔的時間、位置、速度、加速度、水平位置、scale（給圖表與 M4 指標用，見 D-026）
 }
 ```
 

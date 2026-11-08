@@ -41,10 +41,11 @@
 **目的**：讓使用者在**真實影片**上目視確認追蹤是否正確，再投入 M3 計算。**需使用者實機驗證**（同 Q10）。
 
 ## M3 速度計算（可與 M1/M2 平行）
-- [ ] `Calibrator`、缺漏內插、`Resampler`
-- [ ] `SavitzkyGolay`（平滑、一階、二階導數，鏡像邊界）
-- [ ] 合成訊號測試（ALGORITHMS §8）
-**驗收**：已知速度函數的誤差 < 0.02 m/s。
+- [x] `Calibrator`（§1 比例尺、§2 位置）、`GapFiller`（§3 缺漏內插）、`Resampler`（§3 等間隔） — 各附單元測試；`Calibrator` 單位/座標手算例、`GapFiller` 缺漏 =maxGap/+1 邊界、`Resampler` 變動影格率線性精確＋整數倍 span 不掉尾幀
+- [x] `SavitzkyGolay`（平滑、一階、二階導數，鏡像邊界，係數最小平方＋快取） — 多項式精確性、線性含邊界、二次內部、含雜訊正弦導數測試
+- [x] `KinematicSeries` + `Kinematics.computeSeries`（串 §1–4）；端對端合成訊號測試（ALGORITHMS §8） — MV < 0.02 m/s、ROM < 1 cm，涵蓋 1 下／3 下／30fps／60fps／變動影格率／內部缺漏內插／靜止無動作／空輸入／全缺漏丟 trackingLost
+**驗收**：達成。合成**訊號**（σ=2px 高斯）與合成**影片→真實 Vision 追蹤**（`KinematicsVideoTests`）兩路端對端 MV 誤差 < 0.02 m/s、ROM < 1 cm。`swift test` 79/79（VBTCore 47、VBTVision 32）。
+**狀態（2026-11-08）**：純 VBTCore，未動 App，未改公式／預設參數 → `analysisVersion` 維持 1。經 `algorithm-reviewer` 審查：修正 `Resampler` 浮點掉尾幀（R1）、補 §8 邊界整合測試（R2/S2）。PV（峰值速度）為雜訊敏感的 `max(v)`，§8 未設界，其準確度與完整 accuracy-check「次數」列待 M4 `RepSegmenter` 後驗。見 DECISIONS D-026。
 
 ## M4 次數切分與指標（可與 M1/M2 平行）
 - [ ] `RepSegmenter`（兩種動作順序）

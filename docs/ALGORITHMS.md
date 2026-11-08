@@ -25,6 +25,8 @@ x_m[i] = (x[i] − x[0]) × widthPx  × scale     // 只用來畫軌跡
 2. 連續缺漏 ≤ `maxGapFrames` → 線性內插；超過 → `trackingLost(atTime:)`。
 3. 依時間戳線性內插到等間隔網格 `dt = 1 / nominalFPS`（影片可能是變動影格率）。
 
+> 落在片段**開頭或結尾**的缺漏沒有兩側有效點可內插：若 ≤ `maxGapFrames` 則丟棄那幾幀（等間隔網格晚一點開始／早一點結束），> `maxGapFrames` 仍丟 `trackingLost`（見 DECISIONS D-026）。
+
 ## 4. 平滑與微分（Savitzky-Golay）
 - 視窗長度 `N = 奇數(round(sgWindowSeconds × fps))`，最少 5。多項式階數 `sgOrder`。
 - 用 SG 係數同時求：平滑位置 `p`、一階導數 `v`（÷dt）、二階導數 `a`（÷dt²）。
