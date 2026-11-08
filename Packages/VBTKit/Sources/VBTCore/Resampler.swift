@@ -30,7 +30,9 @@ public enum Resampler {
         guard span > 0 else {
             return Grid(dt: dt, time: [t0], x: [samples[0].x], y: [samples[0].y])
         }
-        let count = Int((span / dt).rounded(.down)) + 1
+        // 加 epsilon 再向下取整：避免 span/dt 剛好是整數時因浮點誤差（如 0.3/0.1 = 2.999…）
+        // 少算一格而掉掉尾幀（§8「最後放下槓鈴」「從動作中間開始」會落在片段尾端）。
+        let count = Int((span / dt + 1e-9).rounded(.down)) + 1
 
         var times = [Double]()
         var xs = [Double]()

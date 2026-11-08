@@ -41,14 +41,27 @@ struct ResamplerTests {
         #expect(abs(g.y[1] - 0.5) < tol)
     }
 
-    @Test("網格不超過最後一個樣本時間")
-    func gridWithinRange() {
+    @Test("span 剛好是 dt 整數倍時尾幀不被浮點誤差掉掉")
+    func integerSpanKeepsLastFrame() {
+        // 0.3 / 0.1 = 3（浮點上是 2.999…）：應得 4 點，尾端貼齊 0.3。
         let s = [
             CalibratedSample(time: 0, x: 0, y: 0, confidence: 1),
             CalibratedSample(time: 0.3, x: 0, y: 3, confidence: 1),
         ]
         let g = Resampler.resample(s, dt: 0.1)
-        #expect(g.time.last! <= 0.3 + tol)
+        #expect(g.time.count == 4)
+        #expect(abs(g.time.last! - 0.3) < tol)
+        #expect(abs(g.y.last! - 3) < tol)
+    }
+
+    @Test("網格不超過最後一個樣本時間")
+    func gridWithinRange() {
+        let s = [
+            CalibratedSample(time: 0, x: 0, y: 0, confidence: 1),
+            CalibratedSample(time: 0.35, x: 0, y: 3.5, confidence: 1),
+        ]
+        let g = Resampler.resample(s, dt: 0.1)
+        #expect(g.time.last! <= 0.35 + tol)
     }
 
     @Test("少於兩點時原樣回傳")
