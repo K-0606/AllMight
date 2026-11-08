@@ -48,11 +48,12 @@
 **狀態（2026-11-08）**：純 VBTCore，未動 App，未改公式／預設參數 → `analysisVersion` 維持 1。經 `algorithm-reviewer` 審查：修正 `Resampler` 浮點掉尾幀（R1）、補 §8 邊界整合測試（R2/S2）。PV（峰值速度）為雜訊敏感的 `max(v)`，§8 未設界，其準確度與完整 accuracy-check「次數」列待 M4 `RepSegmenter` 後驗。見 DECISIONS D-026。
 
 ## M4 次數切分與指標（可與 M1/M2 平行）
-- [ ] `RepSegmenter`（兩種動作順序）
-- [ ] `MetricsCalculator`（rep 指標 + 組別摘要 + MPV）
-- [ ] 邊界測試（ALGORITHMS §8 全部）
-- [ ] `AnalysisPipeline` actor 串起 M2–M4，進度回報、取消
-**驗收**：合成 3 下訊號次數正確、MV/ROM 誤差在範圍內；取消可在 0.5 秒內停止。
+- [x] `RepSegmenter`（兩種動作順序）— §5 狀態機；核心去抖後兩端延伸到位置轉折點（見 D-027）；minROM 有效向心；硬舉配後／蹲臥配前離心；尾端無對應向心的離心不算一下。`RepSegmenterTests` 10 筆（§8 邊界全涵蓋）
+- [x] `MetricsCalculator`（rep 指標 + 組別摘要 + MPV）— §6 全指標（MV/PV/ROM/MPV、離心、restAfter、相對第 1 下；摘要 repCount/meanVelocity/peakVelocity/meanROM/velocityLoss）。`MetricsCalculatorTests` 6 筆（含 MPV 推進段界定、速度損失、restAfter）
+- [x] 邊界測試（ALGORITHMS §8 全部）— 1 下／沒動作／從動作中間開始／最後放下槓鈴／缺漏=maxGapFrames／30fps/60fps/變動影格率，皆次數正確、MV<0.02、ROM<1cm
+- [x] `AnalysisPipeline` actor 串起 M2–M4，進度回報、取消 — VBTVision actor，`AsyncThrowingStream<AnalysisProgress>`（tracking→analyzing→finished）；取消經 onTermination→Task 取消→每幀 checkCancellation。`AnalysisPipelineTests` 3 筆（合成影片端對端次數=3、進度遞增、取消<0.5s）
+**驗收**：達成。`swift test` 98/98（VBTCore 新增 16、VBTVision 新增 3）、App `xcodebuild test` 14/14。合成 3 下訊號與合成影片端對端次數正確、MV 誤差 <0.02 m/s、ROM <1 cm；取消 <0.5 秒停止。
+**狀態（2026-11-09）**：純 VBTCore 新增切分/指標型別與兩計算器；VBTVision 新增 `AnalysisPipeline`（+`TrackingRun.geometry`、`TrackingRunner.onProgress` 加法式變更）。未改公式/預設參數 → `analysisVersion` 維持 1。Q8（minROM 統一 0.10）、scaleMismatch（延 M7）見 DECISIONS D-027。經 `algorithm-reviewer` 審查。真實影片端對端數值待 M5 結果頁接上後、由使用者實機驗證（Q10）。
 
 ## M5 分析中、RPE、結果頁
 - [ ] `AnalysisProgressView`（進度、狀態文字、取消、錯誤導回）
@@ -71,7 +72,7 @@
 ## M7 打磨與真實影片驗證
 - [ ] `FilmingTipsView`
 - [ ] 效能：30 秒 60fps 影片分析時間量測（實機），目標 ≤ 15 秒
-- [ ] 用使用者提供的測試影片集調整參數，記錄在 DECISIONS
+- [ ] 用使用者提供的測試影片集調整參數，記錄在 DECISIONS（含：真實影片黏滯點是否讓 `RepSegmenter` 把一下切成兩下——目前已驗單調上升的下陷不會被切，真正位置反轉才切；需實片確認；以及 scaleMismatch 警告、各動作 minROM，見 D-027）
 - [ ] 錯誤與空狀態全部走過一次
 **驗收**：PRD §1 成功標準達成，或列出差距與原因。
 

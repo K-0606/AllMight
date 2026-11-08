@@ -146,3 +146,13 @@
   5. **PV 不是 §8 的 M3 驗收門檻**：§8 只要求 MV < 0.02 m/s、ROM < 1 cm、次數正確。峰值速度 PV = `max(v)`（§6）對雜訊敏感：σ=2px 時 60fps 約 +13%、30fps 約 +25%（SG 導數在較大 dt 放大單點雜訊，也是 D-016 推薦 60fps 的原因）。測試對 PV 只做寬鬆 sanity 檢查（0.15 m/s），完整 PV／「次數」驗收待 M4 `RepSegmenter` 與 `AnalysisPipeline`。
 - 驗證：合成**訊號**（VBTCoreTests）與合成**影片→真實 Vision 追蹤**（VBTVisionTests `KinematicsVideoTests`）兩路端對端皆達 §8 門檻；`swift test` 79/79。
 - 替代：開頭/結尾缺漏改用最近有效值外插（會造假位移，未採用）；`KinematicSeries` 只存速度、M4 重算加速度（重複計算，未採用）。
+
+## D-027 M4 次數切分與指標：minROM、scaleMismatch 與相位邊界定義
+- 2026-11-09 · 已決定（使用者 + Agent，實作 M4 時決定；經 algorithm-reviewer 審查）
+- 背景：M4 實作 `RepSegmenter`（§5）、`MetricsCalculator`（§6）、新型別（`Phase`/`PhaseKind`/`PhaseMetrics`/`RepMetrics`/`SetSummary`/`SetAnalysis`，純 VBTCore）與 `AnalysisPipeline`（VBTVision actor，串追蹤→運動學→切分→指標，`AsyncThrowingStream<AnalysisProgress>` 回報進度、支援取消）。沒有改任何 §1–§6 公式或 §7 預設參數，故 `analysisVersion` 維持 1。決定如下：
+  1. **minROM 全動作單一值 0.10 m（回答 Q8）**：使用者決定 M4 五個動作都用 `AnalysisParameters.minROM = 0.10 m`，不改參數結構；各動作差異留到 M7 用真實影片實測再調。`RepSegmenter` 直接讀 `parameters.minROM`。
+  2. **scaleMismatch（§1 的 25% 比例尺差異警告）延到 M7**：此警告需「追蹤框寬度中位數」，但 `TrackSample` 目前不帶框寬（D-006 只用中心點）。使用者決定 M4 **不做**，保持切分/指標為純 VBTCore、不動 `TrackSample` 格式與現有 VBTVision 測試；留到 M7 用真實影片時再加 `TrackSample.boxWidth` 並實作警告。非阻擋性旗標，延後不影響 MVP 數值正確性。
+  3. **相位邊界＝位置轉折點（§5 的工程澄清）**：§5 寫「階段起點往前回推到 v 跨過 0 的那一點（讓位移與時間完整）」。實作上，向心/離心的核心先以「速度連續 ≥ minPhaseSeconds 超過 velThreshold」偵測（去抖），再把核心**兩端**都向外延伸到位置的局部極值（＝速度跨 0）。用位置極值而非直接找速度零點，是因為極值附近速度≈0、雜訊會左右正負號，直接找零點會讓每下少算 1–2 幀、使 MV 被高估（實測 σ=2px 時某下 MV 誤差衝到 0.020）；改用位置轉折點後三下 MV 誤差回到 −0.008…+0.003 m/s，穩穩在 §8 的 0.02 門檻內。此為對「讓位移與時間完整」的忠實落實，未改任何既有公式/預設值，`analysisVersion` 維持 1。ALGORITHMS §5 已補此澄清。
+  4. **TrackingRun 增 geometry、TrackingRunner 增選用 onProgress**：`AnalysisPipeline` 重用 M2.5 的 `TrackingRunner`（D-025），需要轉正幾何給 `Kinematics`，故 `TrackingRun` 加 `geometry: VideoGeometry`；並加選用 `onProgress` 逐幀回報追蹤進度。皆為加法式變更，不影響既有呼叫（App 追蹤預覽頁不受影響）。`AnalysisProgress` 放 VBTVision（靠近 `AnalysisPipeline`）。
+- 驗證：`swift test` 98/98（VBTCore 新增 `RepSegmenterTests` 10、`MetricsCalculatorTests` 6；VBTVision 新增 `AnalysisPipelineTests` 3）；涵蓋 §8 全部邊界（1 下／沒動作／從動作中間開始／最後放下槓鈴／缺漏=maxGapFrames／30fps/60fps/變動影格率）、兩種動作順序配對、MPV 推進段界定、速度損失、restAfter；合成影片端對端次數=3、取消 < 0.5 秒停止。App `xcodebuild test` 14/14（VBTVision API 加法式變更相容）。
+- 替代：各動作不同 minROM（無真實影片依據，未採用）；M4 就加 boxWidth 做 scaleMismatch（跨到 VBTVision 追蹤輸出與測試，範圍過大，未採用）；相位邊界直接找速度零點（雜訊敏感、MV 高估，未採用）。

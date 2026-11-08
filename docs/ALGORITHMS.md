@@ -12,7 +12,7 @@
 scale (m/px) = plateDiameterCm / 100 / selection.diameterPx
 ```
 - `diameterPx` 來自使用者調整的圓圈，以轉正後影像像素為準。
-- 檢查：追蹤框寬度中位數（px）與 `diameterPx` 相差 > 25% → 在結果加一個警告旗標 `scaleMismatch`（不阻擋）。
+- 檢查：追蹤框寬度中位數（px）與 `diameterPx` 相差 > 25% → 在結果加一個警告旗標 `scaleMismatch`（不阻擋）。**延到 M7**：需 `TrackSample` 帶框寬（目前 D-006 只存中心點），M4 先不做（見 D-027）。
 
 ## 2. 位置
 ```
@@ -37,7 +37,7 @@ x_m[i] = (x[i] − x[0]) × widthPx  × scale     // 只用來畫軌跡
 狀態：`rest / concentric / eccentric`。
 - 進入向心：`v > velThreshold` 連續 ≥ `minPhaseSeconds`；進入離心：`v < −velThreshold` 同理。
 - 階段結束：`|v| ≤ velThreshold` 或速度反向。
-- 階段起點往前回推到 `v` 跨過 0 的那一點（讓位移與時間完整）。
+- 階段**兩端**都回推／延伸到 `v` 跨過 0 的那一點（讓位移與時間完整）。實作上以位置的局部極值定位這個零點（向心＝底→頂，離心＝頂→底）：極值附近速度≈0、雜訊會左右正負號，用位置轉折點比直接找速度零點穩，否則每下會少算 1–2 幀、MV 被高估（見 DECISIONS D-027）。
 - 有效向心：位移 ≥ `minROM`。無效的向心段忽略。
 - 一下（rep）的組成：
   - `startsWithConcentric == true`（硬舉）：有效向心 + 之後緊接的離心（若有）。
@@ -49,12 +49,12 @@ x_m[i] = (x[i] − x[0]) × widthPx  × scale     // 只用來畫軌跡
 | 指標 | 定義 |
 |---|---|
 | 向心平均速度 MV | `(p[e] − p[s]) / T` |
-| 峰值速度 PV | `max(v[s...e])` |
+| 峰值速度 PV | `max(v[s...e])`（有多個相同最大值時取最早索引，供 MPV 找煞車點用） |
 | 動作幅度 ROM | `p[e] − p[s]`（顯示為 cm） |
 | MPV | 推進段 `[s, k]` 的平均速度，`k` = PV 之後第一個 `a < −9.81` 的索引的前一點；若沒有這樣的點，`k = e`。`MPV = (p[k] − p[s]) / (t[k] − t[s])` |
 | 離心平均速度 | `|p[e'] − p[s']| / T'`（取絕對值） |
 | 離心峰值速度 | `max(|v|)` in 離心段 |
-| 離心/向心比 | `離心 MV / 向心 MV × 100%` |
+| 離心/向心比 | `離心 MV / 向心 MV × 100%`（衍生值，不落在 `RepMetrics`，由顯示層以 `eccentric.meanVelocity / concentric.meanVelocity` 計算） |
 | 間隔 restAfter | 下一下的第一個階段起點 − 這一下的最後一個階段終點 |
 | 相對第 1 下 | `(MV_n − MV_1) / MV_1 × 100%`（顯示「↓11%」） |
 
@@ -78,7 +78,7 @@ x_m[i] = (x[i] − x[0]) × widthPx  × scale     // 只用來畫軌跡
 | sgOrder | 3 | SG 多項式階數 |
 | velThreshold | 0.05 m/s | 階段判斷門檻 |
 | minPhaseSeconds | 0.10 s | 階段最短持續時間 |
-| minROM | 0.10 m | 有效向心最小位移（各動作可覆寫，待實測） |
+| minROM | 0.10 m | 有效向心最小位移（M4 五動作統一 0.10 m，回答 Q8；各動作覆寫待 M7 實測，見 D-027） |
 | maxCenterJumpFactor | 0.5 | 追蹤：單幀中心跳動上限 = 此值 × 槓片直徑（px），超過視為缺漏（見 skill plate-tracking §3、DECISIONS D-022） |
 | maxAreaGrowthFactor | 2.0 | 追蹤：追蹤框面積相對初始框成長上限倍數，超過視為缺漏 |
 | minAreaShrinkFactor | 0.5 | 追蹤：追蹤框面積相對初始框縮小下限倍數，低於視為缺漏 |
