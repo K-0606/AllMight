@@ -7,14 +7,23 @@ import VBTVision
 /// 這是 M2 之後插入的驗證步驟（非 PRD 畫面）；追蹤引擎與 M4 分析管線共用 `TrackingRunner`。
 struct TrackingPreviewView: View {
     @State private var model: TrackingPreviewModel
+    /// 使用者確認追蹤正確後，進入正式分析（見 FLOW、ROADMAP M5）。
+    let onStartAnalysis: () -> Void
 
-    init(clip: VideoClip, trimStartSeconds: Double, trimEndSeconds: Double, selection: PlateSelection) {
+    init(
+        clip: VideoClip,
+        trimStartSeconds: Double,
+        trimEndSeconds: Double,
+        selection: PlateSelection,
+        onStartAnalysis: @escaping () -> Void
+    ) {
         _model = State(wrappedValue: TrackingPreviewModel(
             clip: clip,
             trimStartSeconds: trimStartSeconds,
             trimEndSeconds: trimEndSeconds,
             selection: selection
         ))
+        self.onStartAnalysis = onStartAnalysis
     }
 
     var body: some View {
@@ -46,13 +55,21 @@ struct TrackingPreviewView: View {
                 statusBar
                 Spacer()
                 if model.phase == .ready {
-                    Button("重播") { model.replay() }
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Theme.Color.background)
-                        .padding(.horizontal, Theme.Space.l)
-                        .padding(.vertical, Theme.Space.s)
-                        .background(Theme.Color.accent, in: Capsule())
-                        .padding(.bottom, Theme.Space.l)
+                    VStack(spacing: Theme.Space.m) {
+                        Button("重播") { model.replay() }
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Theme.Color.background)
+                            .padding(.horizontal, Theme.Space.l)
+                            .padding(.vertical, Theme.Space.s)
+                            .background(Theme.Color.accent, in: Capsule())
+
+                        PrimaryButton("開始分析", systemImage: "chart.line.uptrend.xyaxis") {
+                            model.stop()
+                            onStartAnalysis()
+                        }
+                    }
+                    .padding(.horizontal, Theme.Space.l)
+                    .padding(.bottom, Theme.Space.l)
                 }
             }
         }

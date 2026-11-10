@@ -156,3 +156,22 @@
   4. **TrackingRun 增 geometry、TrackingRunner 增選用 onProgress**：`AnalysisPipeline` 重用 M2.5 的 `TrackingRunner`（D-025），需要轉正幾何給 `Kinematics`，故 `TrackingRun` 加 `geometry: VideoGeometry`；並加選用 `onProgress` 逐幀回報追蹤進度。皆為加法式變更，不影響既有呼叫（App 追蹤預覽頁不受影響）。`AnalysisProgress` 放 VBTVision（靠近 `AnalysisPipeline`）。
 - 驗證：`swift test` 98/98（VBTCore 新增 `RepSegmenterTests` 10、`MetricsCalculatorTests` 6；VBTVision 新增 `AnalysisPipelineTests` 3）；涵蓋 §8 全部邊界（1 下／沒動作／從動作中間開始／最後放下槓鈴／缺漏=maxGapFrames／30fps/60fps/變動影格率）、兩種動作順序配對、MPV 推進段界定、速度損失、restAfter；合成影片端對端次數=3、取消 < 0.5 秒停止。App `xcodebuild test` 14/14（VBTVision API 加法式變更相容）。
 - 替代：各動作不同 minROM（無真實影片依據，未採用）；M4 就加 boxWidth 做 scaleMismatch（跨到 VBTVision 追蹤輸出與測試，範圍過大，未採用）；相位邊界直接找速度零點（雜訊敏感、MV 高估，未採用）。
+
+## D-028 M5 分析中／RPE／結果頁：流程接點、軌跡線（回答 Q4）、不持久化、速度曲線範圍標示延後
+- 2026-11-09 · 已決定（使用者 + Agent，實作 M5 時決定；經 ios-reviewer 審查）
+- 背景：M5 全為 App 層 SwiftUI，串起「分析中 → RPE → 結果頁」整條流程，重用 M4 的 `AnalysisPipeline`（VBTVision actor）。未動 Packages/VBTKit，`analysisVersion` 維持 1。決定如下：
+  1. **流程接點（使用者決定）**：點選槓片 →「鎖定並追蹤」→ 追蹤驗證頁（M2.5 `TrackingPreviewView`，加一顆「開始分析」按鈕）→ 分析中（`AnalysisProgressView`）→ RPE sheet → 結果頁。保留追蹤驗證頁當「分析前的目視安全檢查」，因真實影片追蹤準確度（Q10）要到 M7 才實機驗證；M7 驗證通過後可再切成 FLOW.md 的正式路徑（點選槓片直接進分析）。**RPE 在看結果之前**選（符合 FLOW、PRD §3.6→3.7→3.8）。
+  2. **結果頁畫一條槓鈴軌跡線（回答 Q4）**：使用者決定在結果頁播放器上疊一條軌跡線（非完整疊圖，完整疊圖仍是 V1.2）。由 `series`（公尺，相對第一樣本，`scale`=m/px）以 `selection.center`（Vision 正規化）為錨點反推回正規化座標、再換算顯示座標（與 `TrackingPreview` 疊點同一套映射，`Calibrator` §2 正向公式的逆運算）。不需改 VBTKit、不需把原始 `TrackSample` 帶進 `SetAnalysis`。
+  3. **M5 不持久化（使用者確認）**：結果頁只呈現記憶體中的 `SetAnalysis`，不寫 SwiftData、不存樣本檔。儲存與歷史（`WorkoutSet`）留 M6。結果頁摘要卡暫不放「編輯」按鈕（編輯是 M6）。
+  4. **導覽路由**：`ResultContext`（含 `SetAnalysis` + 設定值 + `rpe`/`isWarmup` + clip/trim/selection）以 `id: UUID` 作 `Hashable`（`SetAnalysis` 非 Hashable）。錯誤/取消用 `popLast(n)` 退回對應步驟：追蹤遺失與取消回點選槓片（PRD §3.6「回 3.5」）、沒偵測到次數回剪輯（「回 3.4」）。RPE sheet 加 `interactiveDismissDisabled()`，必須明確選一項（含「跳過」）才離開，避免滑掉 sheet 卡在分析中頁（ios-reviewer 指出的死路）。
+  5. **速度曲線「逐下標示範圍」延後**：PRD §3.8 要求速度曲線標出每一下的範圍（R1、R2…），但 `SetAnalysis.reps`（`RepMetrics`）**不含相位的起訖時間**（`PhaseMetrics` 只有 duration/MV/PV/位移）。要精確標範圍需把相位時間（或 `Phase` 的 time 區間）帶進 `SetAnalysis`——屬 VBTKit 型別變更，M5 刻意不做。M5 的速度曲線先畫面積曲線 + 拖曳讀值（`chartXSelection`），逐下範圍標示待日後決定是否擴充 VBTKit 輸出（見 OPEN_QUESTIONS Q11）。
+- 驗證：`BuildProject` 成功、`swift test` 99/99（VBTKit 未動）、App `xcodebuild test` 19/19（iPhone 17，新增 `FormattersTests` 5：PRD §3.8 速度/cm/%/秒格式）。ios-reviewer 審查：修正 RPE sheet 滑掉卡死（must-fix）、補速度曲線 VoiceOver 文字替代、摘要字串改 Text 插值、Formatters 固定 `en_US_POSIX` 小數點。真實影片端對端數值與 VoiceOver 實地體驗待使用者實機驗證（Q10）。
+- 替代：分析取代追蹤驗證頁成為正式流程（使用者選擇保留驗證頁至 M7）；把原始 `TrackSample` 或相位時間帶進 `SetAnalysis` 以利軌跡/範圍標示（M5 不需要，延後）。
+
+## D-029 圈選大小同時影響追蹤穩定度與比例尺校正（實機觀察，改善列入 M7）
+- 2026-11-10 · 已決定（使用者：先維持現狀、列入 M7 待做）
+- 背景：使用者實機測試背蹲舉（側拍），在追蹤驗證頁比較不同圈選大小。信心 97–98%、未跟丟、844 樣本；但**圈畫大時軌跡線左右抖、圈貼齊槓片時滑順**。
+- 原因（已核對程式 `PlateTracker.initialBoundingBox`）：使用者畫的圈直徑 = Vision `VNTrackObjectRequest` 初始追蹤框邊長。圈大 → 框把背景、深蹲架直立桿、槓鈴桿等強邊緣框進去 → 每幀重估框邊界時框中心漂移 → 追蹤驗證頁畫的是**原始框中心（未平滑）**，故水平抖動直接可見；且 `maxCenterJumpPx = 0.5 × diameterPx` 也隨圈變大而放寬、過濾更鬆。圈貼齊圓形高對比槓片時框穩、線滑順。
+- 對數值的影響：水平抖動**不進速度/ROM**（只用垂直位置，x 僅畫軌跡）；垂直雜訊由 Savitzky-Golay 平滑，MV/ROM 穩、PV 較敏感。真正系統性風險是**校正**：圈同時決定 `scale = plateDiameterCm/100/diameterPx`（D-006），圈比槓片實際外緣大 → diameterPx 偏大 → scale 偏小 → 速度與 ROM 整體被低估（圈大 ~20% ≈ 低估 ~20%）；圈比槓片小則反向高估。
+- 決定：**先維持現狀**（正確用法＝圈貼齊槓片外緣，畫面已有提示「調整圓圈貼齊槓片外緣」）；不動 VBTKit。改善列入 ROADMAP M7：(a) 落地 D-027 的 scaleMismatch 警告（追蹤框大小 vs 使用者圈差太多 → 提示重畫）；(b) 追蹤驗證頁軌跡線顯示時加平滑（純視覺）；(c) 點選槓片頁加強貼齊引導。
+- 替代：現在就改追蹤或加平滑（非 MVP 必要，追蹤信心已高，未採用）。

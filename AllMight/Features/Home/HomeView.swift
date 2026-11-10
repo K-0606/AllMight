@@ -26,6 +26,8 @@ enum TrainingRoute: Hashable {
     case trim(VideoClip)
     case plateSelect(VideoClip, trimStartSeconds: Double, trimEndSeconds: Double)
     case trackingPreview(VideoClip, trimStartSeconds: Double, trimEndSeconds: Double, selection: PlateSelection)
+    case analysis(VideoClip, trimStartSeconds: Double, trimEndSeconds: Double, selection: PlateSelection)
+    case result(ResultContext)
 }
 
 /// 「訓練」分頁入口：影片分析大卡片與「拍攝建議」次要入口。
@@ -33,6 +35,8 @@ enum TrainingRoute: Hashable {
 private struct TrainingTab: View {
     @State private var path: [TrainingRoute] = []
     @State private var setupModel = VideoSetupModel()
+    /// 分析成功後、選 RPE 前的暫存；觸發 RPE sheet。
+    @State private var pendingRPE: PendingAnalysis?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -98,11 +102,66 @@ private struct TrainingTab: View {
                         clip: clip,
                         trimStartSeconds: start,
                         trimEndSeconds: end,
-                        selection: selection
+                        selection: selection,
+                        onStartAnalysis: {
+                            path.append(.analysis(clip, trimStartSeconds: start, trimEndSeconds: end, selection: selection))
+                        }
                     )
+                case let .analysis(clip, start, end, selection):
+                    AnalysisProgressView(
+                        clip: clip,
+                        trimStartSeconds: start,
+                        trimEndSeconds: end,
+                        selection: selection,
+                        exercise: setupModel.exercise,
+                        plateDiameterCm: setupModel.plateDiameterCm,
+                        onFinished: { analysis in
+                            pendingRPE = PendingAnalysis(
+                                analysis: analysis,
+                                clip: clip,
+                                trimStartSeconds: start,
+                                trimEndSeconds: end,
+                                selection: selection,
+                                exercise: setupModel.exercise,
+                                loadKg: setupModel.loadKg
+                            )
+                        },
+                        onCancel: { popLast(2) },          // 回點選槓片（PRD §3.6）
+                        onReselectPlate: { popLast(2) },   // 回點選槓片
+                        onReclip: { popLast(3) }           // 回剪輯片段
+                    )
+                case let .result(context):
+                    ResultView(context: context)
                 }
             }
+            .sheet(item: $pendingRPE) { pending in
+                RPEPickerSheet { rpe, isWarmup in
+                    let context = ResultContext(
+                        analysis: pending.analysis,
+                        clip: pending.clip,
+                        trimStartSeconds: pending.trimStartSeconds,
+                        trimEndSeconds: pending.trimEndSeconds,
+                        selection: pending.selection,
+                        exercise: pending.exercise,
+                        loadKg: pending.loadKg,
+                        rpe: rpe,
+                        isWarmup: isWarmup
+                    )
+                    pendingRPE = nil
+                    // 以結果頁取代分析中頁：移除 analysis，推入 result。
+                    if !path.isEmpty { path.removeLast() }
+                    path.append(.result(context))
+                }
+                // 必須明確選一項（含「跳過」）才離開；避免滑掉 sheet 卡在分析中頁。
+                .interactiveDismissDisabled()
+            }
         }
+    }
+
+    /// 從導覽堆疊尾端移除最多 `count` 個路由（用於錯誤/取消時導回前面步驟）。
+    private func popLast(_ count: Int) {
+        let n = min(count, path.count)
+        path.removeLast(n)
     }
 }
 

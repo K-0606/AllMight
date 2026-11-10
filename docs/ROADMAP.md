@@ -56,11 +56,13 @@
 **狀態（2026-11-09）**：純 VBTCore 新增切分/指標型別與兩計算器；VBTVision 新增 `AnalysisPipeline`（+`TrackingRun.geometry`、`TrackingRunner.onProgress` 加法式變更）。未改公式/預設參數 → `analysisVersion` 維持 1。Q8（minROM 統一 0.10）、scaleMismatch（延 M7）見 DECISIONS D-027。經 `algorithm-reviewer` 審查。真實影片端對端數值待 M5 結果頁接上後、由使用者實機驗證（Q10）。
 
 ## M5 分析中、RPE、結果頁
-- [ ] `AnalysisProgressView`（進度、狀態文字、取消、錯誤導回）
-- [ ] `RPEPickerSheet`
-- [ ] `ResultView`：播放器、摘要、4 格關鍵指標、次數列表（可展開）、速度曲線
-- [ ] 指標說明（ⓘ）文字
-**驗收**：用合成影片從頭走到結果頁；數字格式符合 PRD；VoiceOver 可讀出每一下速度。
+- [x] `AnalysisProgressView`（進度、狀態文字、取消、錯誤導回）— 接 `AnalysisPipeline` stream；`.task` 隨畫面取消；錯誤走 PRD §3.6 文字（追蹤遺失→回點選槓片、沒次數→回剪輯）。`AnalysisModel`（@Observable/@MainActor）
+- [x] `RPEPickerSheet`（6/7/7.5/8/8.5/9/9.5/10、熱身、跳過）— `interactiveDismissDisabled` 必選一項，回傳 `(rpe, isWarmup)`
+- [x] `ResultView`：播放器（疊槓鈴軌跡線，Q4）、摘要卡、4 格關鍵指標、次數列表（可展開看向心/離心/MPV/ROM/間隔/相對第1下）、Swift Charts 速度曲線（拖曳讀值）— `ResultModel`/`VelocityChart`/`RepList`
+- [x] 指標說明（ⓘ）文字 — `MetricInfo`（ROM/峰值/MV/速度損失/MPV）+ `MetricInfoSheet`
+- [x] 共用元件 `PrimaryButton`/`Card`/`MetricTile`/`RepRow`、`Formatters` 結果頁格式、`PreviewData`
+**驗收**：達成（自動化範圍）。導覽接點：點選槓片 → 追蹤驗證頁「開始分析」→ 分析中 → RPE → 結果頁；RPE 在結果之前；M5 不持久化（儲存為 M6）。`BuildProject` 成功、`swift test` 99/99（VBTKit 未動）、App `xcodebuild test` 19/19（iPhone 17，新增 `FormattersTests` 5）。經 ios-reviewer 審查並修正（RPE sheet 滑掉卡死、速度曲線 VoiceOver 文字替代、摘要 Text 插值、Formatters 固定小數點）。**需使用者實機/模擬器驗證**：(a) 用合成影片從頭走到結果頁、數字格式與軌跡線正確；(b) VoiceOver 實地讀出每一下速度與摘要。
+**狀態（2026-11-09）**：純 App 層，未動 VBTKit → `analysisVersion` 維持 1。Q4（結果頁畫軌跡線）已回答並移入 DECISIONS D-028。速度曲線「逐下標示範圍」因 `SetAnalysis.reps` 不含相位時間而延後（見 D-028、OPEN_QUESTIONS Q11）。
 
 ## M6 儲存與歷史
 - [ ] 分析完成自動存 `WorkoutSet` + 樣本檔
@@ -73,6 +75,7 @@
 - [ ] `FilmingTipsView`
 - [ ] 效能：30 秒 60fps 影片分析時間量測（實機），目標 ≤ 15 秒
 - [ ] 用使用者提供的測試影片集調整參數，記錄在 DECISIONS（含：真實影片黏滯點是否讓 `RepSegmenter` 把一下切成兩下——目前已驗單調上升的下陷不會被切，真正位置反轉才切；需實片確認；以及 scaleMismatch 警告、各動作 minROM，見 D-027）
+- [ ] 圈選大小影響追蹤穩定度與校正（2026-11-10 實機觀察，見 DECISIONS D-029）：圈越大→追蹤框越大→框入背景/架子/槓桿強邊緣→框中心每幀漂移→追蹤驗證頁軌跡線左右抖；圈又兼作比例尺(`scale = plateCm/diameterPx`)，圈比槓片大會讓速度/ROM 整體低估。待做：(a) 把 D-027 的 scaleMismatch 警告落地，當 Vision 追蹤框大小與使用者圈差太多時提示重畫；(b) 追蹤驗證頁軌跡線顯示時加平滑（純視覺，不影響計算）；(c) 點選槓片頁加強「貼齊外緣」引導/預設圈更貼。水平抖動本身不進數值（速度/ROM 只用垂直位置），主要影響觀感與（圈過大時的）校正。
 - [ ] 錯誤與空狀態全部走過一次
 **驗收**：PRD §1 成功標準達成，或列出差距與原因。
 
