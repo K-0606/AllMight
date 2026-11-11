@@ -4,7 +4,7 @@ import VBTCore
 /// 分析中頁（PRD §3.6）：顯示追蹤 / 計算進度與狀態文字，可取消；失敗時顯示對應文字並導回。
 struct AnalysisProgressView: View {
     @State private var model: AnalysisModel
-    let onFinished: (SetAnalysis) -> Void
+    let onFinished: (SetAnalysis, [TrackSample]) -> Void
     let onCancel: () -> Void
     let onReselectPlate: () -> Void
     let onReclip: () -> Void
@@ -16,7 +16,7 @@ struct AnalysisProgressView: View {
         selection: PlateSelection,
         exercise: Exercise,
         plateDiameterCm: Double,
-        onFinished: @escaping (SetAnalysis) -> Void,
+        onFinished: @escaping (SetAnalysis, [TrackSample]) -> Void,
         onCancel: @escaping () -> Void,
         onReselectPlate: @escaping () -> Void,
         onReclip: @escaping () -> Void
@@ -54,8 +54,8 @@ struct AnalysisProgressView: View {
         .navigationBarBackButtonHidden(true)
         .task { await model.run() }
         .onChange(of: model.state) { _, newState in
-            if case .finished(let analysis) = newState {
-                onFinished(analysis)
+            if case .finished(let analysis, let samples) = newState {
+                onFinished(analysis, samples)
             }
         }
     }

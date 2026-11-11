@@ -26,6 +26,12 @@ enum Formatters {
         "\(number(cm, maxFractionDigits: 0)) cm"
     }
 
+    /// RPE：整數顯示整數、.5 顯示 1 位小數，固定用小數點：`6`、`7.5`。
+    /// 全 App 共用，避免不同頁面因 locale 差異出現 `7,5`／`7.5` 不一致。
+    static func rpe(_ value: Double) -> String {
+        number(value, maxFractionDigits: 1)
+    }
+
     /// 時間，`m:ss`（剪輯時間軸用）。無條件捨去秒數，讓並排的起、訖、長度彼此一致。
     static func timecode(_ seconds: Double) -> String {
         let total = Int(max(0, seconds))

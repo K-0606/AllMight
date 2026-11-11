@@ -23,10 +23,10 @@ final class ResultModel {
     private var timeObserver: Any?
 
     init(context: ResultContext) {
-        self.player = AVPlayer(url: context.clip.url)
+        self.player = AVPlayer(url: context.videoURL)
         self.trimStartSeconds = context.trimStartSeconds
         self.trimEndSeconds = context.trimEndSeconds
-        self.geometry = context.clip.info.geometry
+        self.geometry = context.geometry
         self.selection = context.selection
         self.series = context.analysis.series
     }

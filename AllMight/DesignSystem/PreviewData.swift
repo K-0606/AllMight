@@ -100,6 +100,10 @@ enum PreviewData {
     /// 假的槓片選取（約在畫面中央）。
     static let selection = PlateSelection(centerX: 0.5, centerY: 0.45, diameterPx: 280)
 
+    /// 結果頁預覽用的影片 URL 與幾何（純 VBTCore 值，不需 import VBTVision）。
+    static let videoURL = URL(fileURLWithPath: "/dev/null")
+    static let geometry = VideoGeometry(widthPx: 1080, heightPx: 1920, nominalFPS: 60)
+
     /// 假的影片片段（直拍 1080×1920、60fps）。URL 僅供型別，不實際播放。
     static let clip = VideoClip(
         url: URL(fileURLWithPath: "/dev/null"),

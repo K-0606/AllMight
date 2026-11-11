@@ -25,7 +25,7 @@ public actor AnalysisPipeline {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let analysis = try await self.runPipeline(
+                    let (analysis, samples) = try await self.runPipeline(
                         url: url,
                         trimStartSeconds: trimStartSeconds,
                         trimEndSeconds: trimEndSeconds,
@@ -35,7 +35,7 @@ public actor AnalysisPipeline {
                         parameters: parameters,
                         continuation: continuation
                     )
-                    continuation.yield(.finished(analysis))
+                    continuation.yield(.finished(analysis, samples: samples))
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -54,7 +54,7 @@ public actor AnalysisPipeline {
         plateDiameterCm: Double,
         parameters: AnalysisParameters,
         continuation: AsyncThrowingStream<AnalysisProgress, Error>.Continuation
-    ) async throws -> SetAnalysis {
+    ) async throws -> (analysis: SetAnalysis, samples: [TrackSample]) {
         // 1. 追蹤（重用 M2.5 的 TrackingRunner，見 D-025），逐幀回報進度。
         let run = try await TrackingRunner().run(
             url: url,
@@ -70,27 +70,19 @@ public actor AnalysisPipeline {
             throw AnalysisError.trackingLost(atTime: lost)
         }
 
-        // 2. VBTCore：運動學 → 次數切分 → 指標。
+        // 2. VBTCore：運動學 → 次數切分 → 指標（抽成 SetAnalyzer，與升級重算共用，見 D-030）。
         continuation.yield(.analyzing)
-        let series = try Kinematics.computeSeries(
+        let analysis = try SetAnalyzer.analyze(
             samples: run.samples,
             selection: selection,
             geometry: run.geometry,
             plateDiameterCm: plateDiameterCm,
+            exercise: exercise,
             parameters: parameters
         )
-        let reps = RepSegmenter.segment(series: series, exercise: exercise, parameters: parameters)
-        guard !reps.isEmpty else { throw AnalysisError.noRepsDetected }
-        let (repMetrics, summary) = MetricsCalculator.metrics(for: reps, series: series)
 
-        Self.logger.info("分析完成 次數=\(summary.repCount, privacy: .public) 平均速度=\(summary.meanVelocity, privacy: .public)m/s")
+        Self.logger.info("分析完成 次數=\(analysis.summary.repCount, privacy: .public) 平均速度=\(analysis.summary.meanVelocity, privacy: .public)m/s")
 
-        return SetAnalysis(
-            analysisVersion: VBTCore.analysisVersion,
-            parameters: parameters,
-            reps: repMetrics,
-            summary: summary,
-            series: series
-        )
+        return (analysis, run.samples)
     }
 }

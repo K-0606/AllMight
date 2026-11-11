@@ -175,3 +175,18 @@
 - 對數值的影響：水平抖動**不進速度/ROM**（只用垂直位置，x 僅畫軌跡）；垂直雜訊由 Savitzky-Golay 平滑，MV/ROM 穩、PV 較敏感。真正系統性風險是**校正**：圈同時決定 `scale = plateDiameterCm/100/diameterPx`（D-006），圈比槓片實際外緣大 → diameterPx 偏大 → scale 偏小 → 速度與 ROM 整體被低估（圈大 ~20% ≈ 低估 ~20%）；圈比槓片小則反向高估。
 - 決定：**先維持現狀**（正確用法＝圈貼齊槓片外緣，畫面已有提示「調整圓圈貼齊槓片外緣」）；不動 VBTKit。改善列入 ROADMAP M7：(a) 落地 D-027 的 scaleMismatch 警告（追蹤框大小 vs 使用者圈差太多 → 提示重畫）；(b) 追蹤驗證頁軌跡線顯示時加平滑（純視覺）；(c) 點選槓片頁加強貼齊引導。
 - 替代：現在就改追蹤或加平滑（非 MVP 必要，追蹤信心已高，未採用）。
+
+## D-030 M6 儲存與歷史：樣本來源、自動儲存、結果頁解耦、編輯範圍
+- 2026-11-11 · 已決定（使用者，開工前拍板「全部照建議」；實作 M6 時決定；經 algorithm-reviewer + ios-reviewer 審查）
+- 背景：M6 全為 App 層接線，但需要原始 `TrackSample[]` 來存檔與「用樣本重算（不重新追蹤）」。`AnalysisPipeline` 原本只回 `SetAnalysis`、丟掉樣本。以下五點由使用者拍板：
+  1. **樣本來源與重算＝(a)+(b) 都做（加法式、不改公式，`analysisVersion` 維持 1）**：
+     - (a) `AnalysisPipeline` 在 `.finished` 一併帶出 `[TrackSample]`（`AnalysisProgress.finished(SetAnalysis, samples:)`）。
+     - (b) 新增 VBTCore 純函式 `SetAnalyzer.analyze(samples:selection:geometry:plateDiameterCm:exercise:parameters:) -> SetAnalysis`，抽出原本 inline 於 `runPipeline` 的 Kinematics→RepSegmenter→MetricsCalculator 鏈；`AnalysisPipeline` 內部改呼叫它，使「即時分析」與「升級重算」走同一段程式、保證等價（`SetAnalyzerTests` 驗等價與 trackingLost/noReps 兩條錯誤契約）。升級重算在 `WorkoutStore.recomputeIfNeeded`。回答 D-007／ARCHITECTURE §4.2。
+  2. **自動儲存時機＝選完 RPE、進結果頁前**：`HomeView` 的 RPE 完成 callback 呼叫 `WorkoutStore.save`（寫 `Samples/<id>.json` + 插入 `WorkoutSet`），結果頁改讀已存紀錄（帶 `recordID`）。非結果頁上的手動按鈕。存檔失敗不擋看結果（記 log、`recordID=nil`、該次不進歷史也不能編輯、隱藏「編輯」）；DB 失敗時清掉剛寫的孤兒樣本檔。
+  3. **結果頁與 `VideoClip` 解耦＝改吃 `url+geometry`**：`ResultContext`/`ResultModel`/`ResultView` 不再依賴 `VideoClip`/`VideoInfo`；新增 `ResultContext(set:fileStore:)` 由 `WorkoutSet` 解碼（`videoFileName`→FileStore URL、`geometryData`→`VideoGeometry`），讓「新分析」與「歷史重看」共用同一結果頁。
+  4. **編輯範圍＝只重量與 RPE、不重算**：比例尺用 `plateDiameterCm` 不是 `load`，重量/RPE 是中繼資料不影響分析數值，故 `WorkoutStore.updateMetadata` 只改欄位、不動 `analysisData`（`updateMetadataKeepsAnalysis` 驗證）。不編輯動作/直徑/片段（直徑若可編會牽動重算與軌跡校正）。符合 PRD §3.8/§3.9。
+  5. **範圍：Q11（速度曲線逐下標示範圍）與 D-029（追蹤/校正改善）不在 M6**，維持預設延後（Q11 待是否擴充 `SetAnalysis` 相位時間；D-029 在 M7）。
+- 連帶工程決定：`FileStore` 加 `write/read`（樣本 JSON 的讀寫仍集中在 FileStore，符合 privacy-and-files）；`WorkoutStore`（App 層、持有 `ModelContext`，App 預設 MainActor 隔離故為 MainActor-isolated、不標 Sendable）；`analysisVersion` 升級重算在進歷史頁 `.task` 統一跑（不在 view body 內改 SwiftData，避免 modifying-state-during-update）。
+- 6. **影片檔單一擁有者 + 刪除後結果頁一致性（實機發現，2026-11-11）**：匯入的影片檔（Videos/<name>）在「當前分析流程」與「存檔後的紀錄」間是同一個檔（存檔不另複製，省空間）。實機發現：看完結果頁後若「返回」會倒退進已消耗的點選槓片/追蹤驗證/分析頁，那些頁仍握著該影片檔；若此時到歷史把該筆刪掉（連同影片檔），倒退回去的頁會讀不到檔（點選槓片頁一直轉圈、再分析丟 `videoUnreadable`）。決定：(a) 分析完成並存檔後把訓練堆疊**重設成只剩結果頁**（`path = [.result]`），讓「返回」回訓練首頁、不再回到消耗過的流程——同時使影片檔在存檔後只剩「紀錄」單一擁有者，並避免倒退重跑產生重複紀錄；(b) 結果頁用 `@Query` 反應式盯住自己的 `recordID`，被刪時切到「已刪除」狀態：影片播放器換成「影片已刪除」佔位、頂部顯示「這筆紀錄已被刪除，如需要請重新分析。」、隱藏「編輯」，但分析數字/曲線/次數仍從記憶體照常呈現。驗證：App build + test 綠（23/23）；導覽與 @Query 刪除狀態屬 UI 行為，需使用者實機驗證。替代：存檔時把影片複製成紀錄專屬檔（雙倍儲存、且會留下 session 匯入的孤兒檔，未採用）。
+- 驗證：`swift test` 103/103、App `xcodebuild test` 23/23（iPhone 17）。reviewer 處理項：統一 RPE 顯示格式（新增 `Formatters.rpe`，RPEPickerSheet/EditSetSheet/ResultView 共用，避免 locale 造成 `7,5`/`7.5` 不一致）、未存檔隱藏「編輯」、存檔失敗清孤兒樣本檔、`HistoryView` 重算/刪除改記 log、HistoryRow 合併 VoiceOver、EditSetSheet Stepper 補 accessibilityValue、強化 `SetAnalyzer` 等價與 trackingLost 測試、補 HistoryView `#Preview`。
+- 替代：只做 (a)（重算邏輯散在 App、難測等價）或只做 (b)（拿不到樣本）；(c) 升級時重新追蹤（違背 D-007、慢）；結果頁手動儲存按鈕（與「自動存」不符）；維持吃 `VideoClip`（歷史重看需造 `VideoInfo`，彆扭）。皆未採用。

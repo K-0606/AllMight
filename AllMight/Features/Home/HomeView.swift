@@ -1,5 +1,8 @@
 import SwiftUI
+import SwiftData
+import os
 import VBTCore
+import VBTVision
 
 /// 首頁：兩個分頁「訓練」與「歷史」。
 /// M0 只放入口與空狀態；實際導覽（影片設定、剪輯、結果、歷史內容）在之後的里程碑接上。
@@ -11,7 +14,7 @@ struct HomeView: View {
                     Label("訓練", systemImage: "figure.strengthtraining.traditional")
                 }
 
-            HistoryTab()
+            HistoryView()
                 .tabItem {
                     Label("歷史", systemImage: "clock.arrow.circlepath")
                 }
@@ -33,6 +36,9 @@ enum TrainingRoute: Hashable {
 /// 「訓練」分頁入口：影片分析大卡片與「拍攝建議」次要入口。
 /// 點影片分析 → 影片設定 → 剪輯（「拍攝建議」頁在 M7 接上）。
 private struct TrainingTab: View {
+    private static let logger = Logger(subsystem: "com.kun0606.AllMight", category: "History")
+
+    @Environment(\.modelContext) private var modelContext
     @State private var path: [TrainingRoute] = []
     @State private var setupModel = VideoSetupModel()
     /// 分析成功後、選 RPE 前的暫存；觸發 RPE sheet。
@@ -115,15 +121,18 @@ private struct TrainingTab: View {
                         selection: selection,
                         exercise: setupModel.exercise,
                         plateDiameterCm: setupModel.plateDiameterCm,
-                        onFinished: { analysis in
+                        onFinished: { analysis, samples in
                             pendingRPE = PendingAnalysis(
                                 analysis: analysis,
-                                clip: clip,
+                                samples: samples,
+                                videoURL: clip.url,
+                                geometry: clip.info.geometry,
                                 trimStartSeconds: start,
                                 trimEndSeconds: end,
                                 selection: selection,
                                 exercise: setupModel.exercise,
-                                loadKg: setupModel.loadKg
+                                loadKg: setupModel.loadKg,
+                                plateDiameterCm: setupModel.plateDiameterCm
                             )
                         },
                         onCancel: { popLast(2) },          // 回點選槓片（PRD §3.6）
@@ -136,21 +145,11 @@ private struct TrainingTab: View {
             }
             .sheet(item: $pendingRPE) { pending in
                 RPEPickerSheet { rpe, isWarmup in
-                    let context = ResultContext(
-                        analysis: pending.analysis,
-                        clip: pending.clip,
-                        trimStartSeconds: pending.trimStartSeconds,
-                        trimEndSeconds: pending.trimEndSeconds,
-                        selection: pending.selection,
-                        exercise: pending.exercise,
-                        loadKg: pending.loadKg,
-                        rpe: rpe,
-                        isWarmup: isWarmup
-                    )
+                    let context = saveAndMakeContext(pending: pending, rpe: rpe, isWarmup: isWarmup)
                     pendingRPE = nil
-                    // 以結果頁取代分析中頁：移除 analysis，推入 result。
-                    if !path.isEmpty { path.removeLast() }
-                    path.append(.result(context))
+                    // 分析已完成並存檔：把整個堆疊重設成只剩結果頁，讓「返回」回到訓練首頁，
+                    // 而不是倒退進已消耗的點選槓片/分析流程（那些頁仍握著影片檔，若該筆被刪會讀不到檔）。
+                    path = [.result(context)]
                 }
                 // 必須明確選一項（含「跳過」）才離開；避免滑掉 sheet 卡在分析中頁。
                 .interactiveDismissDisabled()
@@ -158,33 +157,49 @@ private struct TrainingTab: View {
         }
     }
 
+    /// 選完 RPE 後自動存一組紀錄（含樣本檔），回傳結果頁用的 `ResultContext`（帶 `recordID`）。
+    /// 存檔失敗不擋住看結果：記錄錯誤，`recordID` 為 nil（此次不會進歷史、也不能編輯）。
+    private func saveAndMakeContext(pending: PendingAnalysis, rpe: Double?, isWarmup: Bool) -> ResultContext {
+        var recordID: UUID?
+        do {
+            let set = try WorkoutStore(modelContext: modelContext).save(
+                analysis: pending.analysis,
+                samples: pending.samples,
+                videoFileName: pending.videoURL.lastPathComponent,
+                geometry: pending.geometry,
+                selection: pending.selection,
+                trimStartSeconds: pending.trimStartSeconds,
+                trimEndSeconds: pending.trimEndSeconds,
+                exercise: pending.exercise,
+                loadKg: pending.loadKg,
+                plateDiameterCm: pending.plateDiameterCm,
+                rpe: rpe,
+                isWarmup: isWarmup
+            )
+            recordID = set.id
+        } catch {
+            Self.logger.error("自動儲存失敗：\(error.localizedDescription, privacy: .public)")
+            recordID = nil
+        }
+        return ResultContext(
+            recordID: recordID,
+            analysis: pending.analysis,
+            videoURL: pending.videoURL,
+            geometry: pending.geometry,
+            trimStartSeconds: pending.trimStartSeconds,
+            trimEndSeconds: pending.trimEndSeconds,
+            selection: pending.selection,
+            exercise: pending.exercise,
+            loadKg: pending.loadKg,
+            rpe: rpe,
+            isWarmup: isWarmup
+        )
+    }
+
     /// 從導覽堆疊尾端移除最多 `count` 個路由（用於錯誤/取消時導回前面步驟）。
     private func popLast(_ count: Int) {
         let n = min(count, path.count)
         path.removeLast(n)
-    }
-}
-
-/// 「歷史」分頁：M0 顯示空狀態。
-private struct HistoryTab: View {
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.Color.background.ignoresSafeArea()
-
-                VStack(spacing: Theme.Space.m) {
-                    Image(systemName: "clock")
-                        .font(.largeTitle)
-                        .foregroundStyle(Theme.Color.textSecondary)
-                    Text("還沒有紀錄。到「訓練」分頁匯入第一段影片。")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.Color.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(Theme.Space.xl)
-            }
-            .navigationTitle("歷史")
-        }
     }
 }
 

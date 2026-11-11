@@ -16,8 +16,8 @@ final class AnalysisModel {
         case tracking(fraction: Double)
         /// 追蹤完成，計算運動學與指標中。
         case analyzing
-        /// 完成，附帶結果。
-        case finished(SetAnalysis)
+        /// 完成，附帶結果與原始追蹤樣本（樣本供存檔與升級重算，見 DECISIONS D-030）。
+        case finished(SetAnalysis, samples: [TrackSample])
         /// 失敗，附帶錯誤（App 層對應成 PRD §3.6 文字）。
         case failed(AnalysisError)
     }
@@ -65,8 +65,8 @@ final class AnalysisModel {
                     state = .tracking(fraction: fraction)
                 case .analyzing:
                     state = .analyzing
-                case .finished(let analysis):
-                    state = .finished(analysis)
+                case .finished(let analysis, let samples):
+                    state = .finished(analysis, samples: samples)
                 }
             }
         } catch is CancellationError {

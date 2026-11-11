@@ -69,6 +69,19 @@ nonisolated struct FileStore: Sendable {
         return destination
     }
 
+    /// 把資料寫進指定類別的目錄（例如樣本 JSON），回傳目的地 URL。已存在時覆寫。
+    @discardableResult
+    func write(_ kind: Kind, data: Data, fileName: String) throws -> URL {
+        let destination = try url(for: kind, fileName: fileName)
+        try data.write(to: destination, options: .atomic)
+        return destination
+    }
+
+    /// 讀取指定類別目錄下的檔案內容（例如樣本 JSON）。
+    func read(_ kind: Kind, fileName: String) throws -> Data {
+        try Data(contentsOf: url(for: kind, fileName: fileName))
+    }
+
     /// 刪除單一檔案；檔案不存在時當作成功（不丟錯）。
     func delete(_ kind: Kind, fileName: String) throws {
         let url = try url(for: kind, fileName: fileName)

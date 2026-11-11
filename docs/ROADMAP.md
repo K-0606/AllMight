@@ -65,11 +65,12 @@
 **狀態（2026-11-09）**：純 App 層，未動 VBTKit → `analysisVersion` 維持 1。Q4（結果頁畫軌跡線）已回答並移入 DECISIONS D-028。速度曲線「逐下標示範圍」因 `SetAnalysis.reps` 不含相位時間而延後（見 D-028、OPEN_QUESTIONS Q11）。
 
 ## M6 儲存與歷史
-- [ ] 分析完成自動存 `WorkoutSet` + 樣本檔
-- [ ] `HistoryView`（依日期分組、左滑刪除、刪除連同檔案）
-- [ ] 編輯重量/RPE；用存好的樣本重算（不重新追蹤）
-- [ ] `analysisVersion` 升級時自動重算
-**驗收**：重開 App 資料還在；刪除後檔案確實消失（測試檢查檔案系統）。
+- [x] 分析完成自動存 `WorkoutSet` + 樣本檔 — 選完 RPE、進結果頁前由 `WorkoutStore.save` 寫入（樣本存 Samples/<id>.json）；存檔失敗不擋看結果（recordID=nil、不進歷史、隱藏「編輯」）
+- [x] `HistoryView`（依日期分組、左滑刪除、刪除連同檔案）— `@Query` 依 createdAt 反序、`startOfDay` 分組；左滑→確認對話框→`WorkoutStore.delete`（經 `FileStore.deleteFiles` 刪影片+樣本）；空狀態用 PRD §3.9 文字；點列→同一結果頁
+- [x] 編輯重量/RPE；用存好的樣本重算（不重新追蹤）— 結果頁「編輯」→ `EditSetSheet`（重量 Stepper、RPE chips）→ `WorkoutStore.updateMetadata`（只改中繼資料、不重算，見 D-030）
+- [x] `analysisVersion` 升級時自動重算 — `WorkoutStore.recomputeIfNeeded` 用樣本經 `SetAnalyzer.analyze` 重算並寫回；`HistoryView.task` 的 `recomputeStale()` 進歷史頁時統一處理
+**驗收**：達成（自動化範圍）。`swift test` 103/103（VBTCore 新增 `SetAnalyzerTests` 4；VBTVision `AnalysisPipelineTests` 更新帶 samples）、App `xcodebuild test` 23/23（iPhone 17，新增 `WorkoutStoreTests` 4：存檔建立紀錄+樣本檔、刪除後檔案確實消失（檢查檔案系統）、編輯只改中繼資料、升級重算寫回）。
+**狀態（2026-11-11）**：VBTKit 僅加法式變更（`SetAnalyzer` 純函式、`AnalysisPipeline`/`AnalysisProgress` 帶出 `[TrackSample]`），未改公式/預設參數 → `analysisVersion` 維持 1。結果頁與 `VideoClip` 解耦改吃 `url+geometry`，新分析與歷史重看共用。實機發現並修正：分析存檔後重設訓練堆疊（返回回首頁、影片檔單一擁有者），結果頁反應式偵測該筆被刪 → 顯示「影片已刪除」佔位與「這筆紀錄已被刪除」提示、隱藏編輯、數字照看（見 DECISIONS D-030 第 6 點）。見 DECISIONS D-030。經 algorithm-reviewer 與 ios-reviewer 審查並處理（統一 RPE 格式、未存檔隱藏編輯、存檔失敗清孤兒樣本檔、歷史列合併 VoiceOver、強化等價/trackingLost 測試）。**需使用者實機/模擬器驗證**：重開 App 資料還在、歷史列表與編輯/刪除實際操作、刪除後相簿無影響（只刪 App 容器內複本）。
 
 ## M7 打磨與真實影片驗證
 - [ ] `FilmingTipsView`

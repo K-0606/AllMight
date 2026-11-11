@@ -58,8 +58,12 @@ struct AnalysisPipelineTests {
         )
 
         var analysis: SetAnalysis?
+        var samples: [TrackSample] = []
         for try await progress in stream {
-            if case let .finished(result) = progress { analysis = result }
+            if case let .finished(result, finishedSamples) = progress {
+                analysis = result
+                samples = finishedSamples
+            }
         }
         let result = try #require(analysis, "應回報 finished 結果")
         #expect(result.summary.repCount == 3)
@@ -67,6 +71,9 @@ struct AnalysisPipelineTests {
         #expect(result.summary.meanVelocity > 0)
         #expect(result.summary.meanROM > 0.10)
         #expect(result.analysisVersion == VBTCore.analysisVersion)
+        // finished 一併帶出原始追蹤樣本，供 App 層存檔與升級重算（D-030）。
+        // 用樣本重算的等價性由 SetAnalyzerTests 與「管線內部即呼叫 SetAnalyzer」保證。
+        #expect(!samples.isEmpty)
     }
 
     @Test("進度回報：先 tracking（遞增 0…1）再 analyzing，最後 finished")

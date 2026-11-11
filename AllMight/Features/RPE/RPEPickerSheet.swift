@@ -23,7 +23,7 @@ struct RPEPickerSheet: View {
 
             LazyVGrid(columns: columns, spacing: Theme.Space.m) {
                 ForEach(options, id: \.self) { value in
-                    chip(value.formatted(.number)) { onComplete(value, false) }
+                    chip(Formatters.rpe(value)) { onComplete(value, false) }
                 }
             }
 
