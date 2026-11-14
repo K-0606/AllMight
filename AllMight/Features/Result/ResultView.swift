@@ -110,21 +110,52 @@ struct ResultView: View {
         if isDeleted {
             deletedPlayerPlaceholder
         } else {
-            GeometryReader { geo in
-                let rect = model.imageRect(containerSize: geo.size)
-                ZStack {
-                    VideoLayerView(player: model.player)
-                    PolylineShape(points: model.trajectoryPoints(in: rect))
-                        .stroke(Theme.Color.accent.opacity(0.8), lineWidth: 2)
+            VStack(spacing: Theme.Space.s) {
+                GeometryReader { geo in
+                    let rect = model.imageRect(containerSize: geo.size)
+                    ZStack {
+                        VideoLayerView(player: model.player)
+                        PolylineShape(points: model.trajectoryPoints(in: rect))
+                            .stroke(Theme.Color.accent.opacity(0.8), lineWidth: 2)
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.togglePlayback() }
                 }
-                .frame(width: geo.size.width, height: geo.size.height)
-                .contentShape(Rectangle())
-                .onTapGesture { model.togglePlayback() }
+                .frame(height: 360)
+                .background(Color.black, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
+                .accessibilityLabel("影片片段，疊有槓鈴軌跡線。點一下播放或暫停。")
+
+                playerControls
             }
-            .frame(height: 360)
-            .background(Color.black, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
-            .accessibilityLabel("影片片段，疊有槓鈴軌跡線。點一下播放或暫停。")
+        }
+    }
+
+    /// 播放/暫停 + 可拖拉的進度條 + 時間（PRD §3.8 播放器）。
+    private var playerControls: some View {
+        HStack(spacing: Theme.Space.m) {
+            Button { model.togglePlayback() } label: {
+                Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+                    .foregroundStyle(Theme.Color.accent)
+                    .frame(width: 24, height: 24)
+            }
+            .accessibilityLabel(model.isPlaying ? "暫停" : "播放")
+
+            Slider(
+                value: Binding(
+                    get: { model.currentTimeInClip },
+                    set: { model.scrub(toClipTime: $0) }
+                ),
+                in: 0...max(model.clipDuration, 0.01),
+                onEditingChanged: { editing in if editing { model.beginScrubbing() } }
+            )
+            .tint(Theme.Color.accent)
+            .accessibilityLabel("影片進度")
+
+            Text("\(Formatters.timecode(model.currentTimeInClip)) / \(Formatters.timecode(model.clipDuration))")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(Theme.Color.textSecondary)
         }
     }
 
@@ -213,7 +244,7 @@ struct ResultView: View {
 
     private var chartCard: some View {
         Card(title: "速度曲線", systemImage: "waveform.path.ecg") {
-            VelocityChart(series: analysis.series)
+            VelocityChart(series: analysis.series, reps: analysis.reps)
         }
     }
 

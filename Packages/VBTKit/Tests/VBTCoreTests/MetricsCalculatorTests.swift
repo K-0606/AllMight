@@ -84,6 +84,32 @@ struct MetricsCalculatorTests {
         #expect(summary.velocityLoss == nil)
     }
 
+    @Test("相位指標帶出起訖時間，與切分相位一致（Q11 速度曲線範圍標示）")
+    func phaseTimesMatchSegmentation() throws {
+        let s = constantSeries(segments: [
+            (0, 10), (0.30, 30), (0, 10), (0.27, 30), (0, 10),
+        ])
+        let reps = RepSegmenter.segment(series: s, exercise: .backSquat, parameters: .standard)
+        let (metrics, _) = MetricsCalculator.metrics(for: reps, series: s)
+        #expect(metrics.count == reps.count)
+        for (m, rep) in zip(metrics, reps) {
+            let start = try #require(m.concentric.startTime)
+            let end = try #require(m.concentric.endTime)
+            // 與切分出的相位時間一致，且等於等間隔網格上的時間戳。
+            #expect(abs(start - rep.concentric.startTime) < 1e-12)
+            #expect(abs(end - rep.concentric.endTime) < 1e-12)
+            #expect(abs(start - s.time[rep.concentric.startIndex]) < 1e-12)
+            #expect(abs(end - s.time[rep.concentric.endIndex]) < 1e-12)
+            // duration 與起訖時間一致、時間遞增。
+            #expect(abs(m.concentric.duration - (end - start)) < 1e-12)
+            #expect(start < end)
+            if let ecc = m.eccentric, let eccPhase = rep.eccentric {
+                #expect(abs((ecc.startTime ?? -1) - eccPhase.startTime) < 1e-12)
+                #expect(abs((ecc.endTime ?? -1) - eccPhase.endTime) < 1e-12)
+            }
+        }
+    }
+
     @Test("restAfter＝下一下起點 − 這一下終點")
     func restAfter() {
         let s = constantSeries(segments: [

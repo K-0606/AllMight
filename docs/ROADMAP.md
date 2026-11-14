@@ -73,17 +73,21 @@
 **狀態（2026-11-11）**：VBTKit 僅加法式變更（`SetAnalyzer` 純函式、`AnalysisPipeline`/`AnalysisProgress` 帶出 `[TrackSample]`），未改公式/預設參數 → `analysisVersion` 維持 1。結果頁與 `VideoClip` 解耦改吃 `url+geometry`，新分析與歷史重看共用。實機發現並修正：分析存檔後重設訓練堆疊（返回回首頁、影片檔單一擁有者），結果頁反應式偵測該筆被刪 → 顯示「影片已刪除」佔位與「這筆紀錄已被刪除」提示、隱藏編輯、數字照看（見 DECISIONS D-030 第 6 點）。見 DECISIONS D-030。經 algorithm-reviewer 與 ios-reviewer 審查並處理（統一 RPE 格式、未存檔隱藏編輯、存檔失敗清孤兒樣本檔、歷史列合併 VoiceOver、強化等價/trackingLost 測試）。**需使用者實機/模擬器驗證**：重開 App 資料還在、歷史列表與編輯/刪除實際操作、刪除後相簿無影響（只刪 App 容器內複本）。
 
 ## M7 打磨與真實影片驗證
-- [ ] `FilmingTipsView`
-- [ ] 效能：30 秒 60fps 影片分析時間量測（實機），目標 ≤ 15 秒
-- [ ] 用使用者提供的測試影片集調整參數，記錄在 DECISIONS（含：真實影片黏滯點是否讓 `RepSegmenter` 把一下切成兩下——目前已驗單調上升的下陷不會被切，真正位置反轉才切；需實片確認；以及 scaleMismatch 警告、各動作 minROM，見 D-027）
-- [ ] 圈選大小影響追蹤穩定度與校正（2026-11-10 實機觀察，見 DECISIONS D-029）：圈越大→追蹤框越大→框入背景/架子/槓桿強邊緣→框中心每幀漂移→追蹤驗證頁軌跡線左右抖；圈又兼作比例尺(`scale = plateCm/diameterPx`)，圈比槓片大會讓速度/ROM 整體低估。待做：(a) 把 D-027 的 scaleMismatch 警告落地，當 Vision 追蹤框大小與使用者圈差太多時提示重畫；(b) 追蹤驗證頁軌跡線顯示時加平滑（純視覺，不影響計算）；(c) 點選槓片頁加強「貼齊外緣」引導/預設圈更貼。水平抖動本身不進數值（速度/ROM 只用垂直位置），主要影響觀感與（圈過大時的）校正。
-- [ ] 錯誤與空狀態全部走過一次
+- [x] `FilmingTipsView`（PRD §3.10 靜態說明頁：架設手機／讓槓片入鏡／錄影設定三張卡）— 接上 HomeView「拍攝建議」入口以 sheet 開啟；純 UI 無邏輯，`BuildProject` 成功
+- [x] 效能：30 秒 60fps 影片分析時間量測（實機），目標 ≤ 15 秒 — 使用者實機（A18）量測：15 秒影片約 5–6 秒分析完畢，遠低於目標。達成
+- [~] 用使用者提供的測試影片集調整參數，記錄在 DECISIONS（含：真實影片黏滯點是否讓 `RepSegmenter` 把一下切成兩下——目前已驗單調上升的下陷不會被切，真正位置反轉才切；需實片確認；以及 scaleMismatch 警告、各動作 minROM，見 D-027）— **實機初步（2026-11-14）**：背蹲舉 1/2/5 下次數皆正確、無誤切；scaleMismatch 在圈貼好時不誤報；同一支 2 下影片換更貼的圈，ROM 99.3→64.3 cm（證實圈選=比例尺敏感度，D-029）。**未改任何預設參數**（次數/切分看來正確，minROM 維持 0.10）。真實影片 **ROM 絕對準確度驗證由使用者暫緩**（Q5，之後決定是否取真實 ROM 當對照）；殘差主因圈選子門檻誤差，根治靠 V1.1 半自動貼齊
+- [x] 圈選大小影響追蹤穩定度與校正（2026-11-10 實機觀察，見 DECISIONS D-029）：圈越大→追蹤框越大→框入背景/架子/槓桿強邊緣→框中心每幀漂移→追蹤驗證頁軌跡線左右抖；圈又兼作比例尺(`scale = plateCm/diameterPx`)，圈比槓片大會讓速度/ROM 整體低估。待做：(a) 把 D-027 的 scaleMismatch 警告落地，當 Vision 追蹤框大小與使用者圈差太多時提示重畫；(b) 追蹤驗證頁軌跡線顯示時加平滑（純視覺，不影響計算）；(c) 點選槓片頁加強「貼齊外緣」引導/預設圈更貼。水平抖動本身不進數值（速度/ROM 只用垂直位置），主要影響觀感與（圈過大時的）校正。**M7 第一階段已做：(b) `TrackingPreviewModel` 軌跡線顯示加置中移動平均（純視覺，紅點仍用原始追蹤輸出）；(c) `PlateCircleOverlay` 加深色暈環+四外緣刻度、點選頁加「貼齊外緣才準、不要包含槓桿/背景」副提示（PRD §3.5 的 18% 預設未改）。App build+test 綠（23/23）。(a) scaleMismatch 警告已落地：`TrackSample` 加 optional `boxWidth`、`PlateTracker` 輸出框寬、`Calibrator.scaleMismatch`（框寬中位數 vs 圈直徑差 > 25%）、追蹤驗證頁非阻擋性橫幅提示重畫（analysisVersion 不升、boxWidth 不進數值；見 D-032）。`swift test` 109/109、App 23/23。**25% 門檻的真實影片校準/誤報驗證屬第二階段（需實機）。**
+- [x] 錯誤與空狀態全部走過一次 — 走查確認 PRD §3.3（太短/太長/影格率太低/慢動作/不可讀，`VideoSetupView` exhaustive switch）、§3.3 低影格率 <50fps 建議（`TrimView`，gated `isLowFrameRate`）、§3.6 追蹤遺失→重新點選槓片(回 3.5)／無次數→重新選擇片段(回 3.4)（`AnalysisProgressView`）、§3.9 空狀態（`HistoryView`）文字與導向皆正確；M1/M5/M6 已實作，本步為驗證，無程式變更
+- [x] 結果頁播放器可拖拉進度（實機回報：原本只能點暫停、無法 scrub）— `ResultModel` 加 `currentTimeInClip`/`isPlaying`/`clipDuration`/`scrub`/`beginScrubbing`，`ResultView` 加播放/暫停鈕 + 進度 Slider + 時間（保留軌跡線疊圖與點擊暫停）。App build+test 綠（23/23）
+- [x] 速度曲線逐下範圍標示 R1/R2…（Q11，PRD §3.8）— `PhaseMetrics` 加 optional 相位起訖時間、`VelocityChart` 以 `RectangleMark` 標每下向心範圍並標籤；`analysisVersion` 1→2 讓 M6 舊紀錄升級重算補欄位（加法、數值不變；見 D-031）。`swift test` 111/111、App 23/23
 **驗收**：PRD §1 成功標準達成，或列出差距與原因。
+**狀態（2026-11-12）第一階段（純 App + 加法式 VBTKit，可模擬器驗）完成**：FilmingTipsView、軌跡線平滑、點選槓片貼齊引導、錯誤/空狀態走查、Q11 逐下範圍、scaleMismatch 警告皆完成。`swift test` 111/111（VBTCore +7：MetricsCalculator 相位時間、Calibrator scaleMismatch×6；VBTVision +1：PlateTracker boxWidth）、App `xcodebuild test` 23/23（iPhone 17）。經 algorithm-reviewer（無阻擋問題，補離心時間比對與 scaleMismatch 邊界測試）與 ios-reviewer（補速度曲線逐下範圍的 VoiceOver、警告橫幅 combine 與用語校正）審查並處理。`analysisVersion` 由 1 升 2（D-031，加法欄位觸發舊紀錄升級重算，數值不變）。**第二階段（需使用者實機 + 真實影片）待做**：效能量測 ≤ 15 秒、用 TestVideos 調參並記 DECISIONS（黏滯點切分、scaleMismatch 25% 門檻校準、各動作 minROM）、真實影片端對端準確度目視驗收（Q5/Q10 判定以次數正確 + ROM 目視相符 + 速度量級合理為準）。
 
 ---
 
 ## 後續版本（MVP 之後，未經同意不要實作）
 - V1.1 骨架與關節角度（VNDetectHumanBodyPoseRequest）
+- V1.1 半自動貼齊槓片（`VNDetectContoursRequest` 偵測圓形輪廓、點一下自動吸附圓圈到槓片外緣，使用者仍確認）；全自動偵測槓片更後面，需 M7 真實影片資料證明輪廓偵測夠穩再排（見 D-029/D-032、M7 Q6 決議）
 - V1.2 疊圖重播、拖曳逐幀、縮放、匯出影片
 - V1.3 即時相機模式 + 語音播報
 - V1.4 1RM / LVP、進步趨勢、歷史比較

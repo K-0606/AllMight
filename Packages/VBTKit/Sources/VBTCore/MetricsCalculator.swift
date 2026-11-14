@@ -58,7 +58,8 @@ public enum MetricsCalculator {
             : (v[s...e].max() ?? 0)
         return PhaseMetrics(
             duration: duration, meanVelocity: meanVelocity,
-            peakVelocity: peak, displacement: displacement
+            peakVelocity: peak, displacement: displacement,
+            startTime: phase.startTime, endTime: phase.endTime
         )
     }
 

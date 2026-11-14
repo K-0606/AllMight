@@ -43,6 +43,8 @@ private struct TrainingTab: View {
     @State private var setupModel = VideoSetupModel()
     /// 分析成功後、選 RPE 前的暫存；觸發 RPE sheet。
     @State private var pendingRPE: PendingAnalysis?
+    /// 是否顯示「拍攝建議」說明頁（PRD §3.10）。
+    @State private var showingFilmingTips = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -71,7 +73,7 @@ private struct TrainingTab: View {
                     .buttonStyle(.plain)
 
                     Button {
-                        // M7：導向拍攝建議頁。
+                        showingFilmingTips = true
                     } label: {
                         Text("拍攝建議")
                             .font(.subheadline.weight(.medium))
@@ -153,6 +155,9 @@ private struct TrainingTab: View {
                 }
                 // 必須明確選一項（含「跳過」）才離開；避免滑掉 sheet 卡在分析中頁。
                 .interactiveDismissDisabled()
+            }
+            .sheet(isPresented: $showingFilmingTips) {
+                FilmingTipsView()
             }
         }
     }

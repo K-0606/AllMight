@@ -12,7 +12,7 @@
 scale (m/px) = plateDiameterCm / 100 / selection.diameterPx
 ```
 - `diameterPx` 來自使用者調整的圓圈，以轉正後影像像素為準。
-- 檢查：追蹤框寬度中位數（px）與 `diameterPx` 相差 > 25% → 在結果加一個警告旗標 `scaleMismatch`（不阻擋）。**延到 M7**：需 `TrackSample` 帶框寬（目前 D-006 只存中心點），M4 先不做（見 D-027）。
+- 檢查（scaleMismatch，M7 落地）：Vision 追蹤框寬度中位數（換算 px）與 `diameterPx` 相對相差 > 25%（`Calibrator.scaleMismatchThreshold`）→ 非阻擋性警告，提示使用者圈可能沒貼齊槓片、建議重畫。`TrackSample` 新增 optional `boxWidth`（Vision 正規化框寬，首幀與缺漏為 nil），`PlateTracker` 輸出、`Calibrator.scaleMismatch(...)` 比對。**只影響是否顯示警告、不影響任何數值**，故門檻可調且不觸發 `analysisVersion` 升版；帶框寬樣本不足（含升級前舊樣本）時不警告。顯示在追蹤驗證頁。見 DECISIONS D-032（原 D-006/D-027/D-029）。
 
 ## 2. 位置
 ```
@@ -68,6 +68,8 @@ x_m[i] = (x[i] − x[0]) × widthPx  × scale     // 只用來畫軌跡
 | velocityLoss | `(MV_first − MV_last) / MV_first × 100%`；只有 1 下時為 nil |
 
 > 對照 Arcus 範例：MV 0.28/0.25/0.24 → 平均 0.257（顯示 0.26）、速度損失 14.3%。可作為測試案例的參考數量級。
+
+> **相位時間（v2，M7 Q11）**：`PhaseMetrics` 另帶該相位的起訖時間 `startTime`/`endTime`（秒，相對片段起點，取自 `Phase`），供結果頁速度曲線標示每一下的範圍（R1、R2…）。純加法、不改上表任何數值；為讓升版前的舊紀錄經升級重算補上此欄位，`analysisVersion` 由 1 升為 2（欄位為 optional，舊 JSON 解碼不受影響）。見 DECISIONS D-031。
 
 ## 7. 預設參數（`AnalysisParameters`）
 | 參數 | 預設 | 說明 |

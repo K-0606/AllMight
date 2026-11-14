@@ -94,7 +94,9 @@ final class PlateTracker {
             time: frame.time,
             x: Double(center.x),
             y: Double(center.y),
-            confidence: observation.confidence
+            confidence: observation.confidence,
+            // Vision 正規化框寬，供 scaleMismatch 警告（§1）；首幀回傳的是使用者圈、不帶框寬。
+            boxWidth: Double(box.width)
         )
     }
 

@@ -22,6 +22,13 @@ final class ResultModel {
     private let series: KinematicSeries
     private var timeObserver: Any?
 
+    /// 目前播放時間（秒，相對片段起點），供進度條顯示與拖拉。
+    private(set) var currentTimeInClip = 0.0
+    /// 是否正在播放，供播放/暫停圖示與迴圈判斷。
+    private(set) var isPlaying = false
+    /// 片段長度（秒）。
+    var clipDuration: Double { max(0, trimEndSeconds - trimStartSeconds) }
+
     init(context: ResultContext) {
         self.player = AVPlayer(url: context.videoURL)
         self.trimStartSeconds = context.trimStartSeconds
@@ -39,11 +46,14 @@ final class ResultModel {
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if time.seconds >= self.trimEndSeconds - 0.03 {
+                self.currentTimeInClip = min(max(time.seconds - self.trimStartSeconds, 0), self.clipDuration)
+                // 只有在播放中才自動迴圈；暫停/拖拉到片尾時不搶走進度。
+                if self.isPlaying, time.seconds >= self.trimEndSeconds - 0.03 {
                     self.seekToStart()
                 }
             }
         }
+        isPlaying = true
         player.play()
     }
 
@@ -54,20 +64,41 @@ final class ResultModel {
             self.timeObserver = nil
         }
         player.pause()
+        isPlaying = false
     }
 
     func togglePlayback() {
         if player.timeControlStatus == .playing {
             player.pause()
+            isPlaying = false
         } else {
             if player.currentTime().seconds >= trimEndSeconds - 0.05 {
                 seekToStart()
             }
             player.play()
+            isPlaying = true
         }
     }
 
+    /// 開始拖拉進度：先暫停，避免播放與 seek 互相搶。
+    func beginScrubbing() {
+        player.pause()
+        isPlaying = false
+    }
+
+    /// 拖拉到片段內的指定時間（秒，相對片段起點）。
+    func scrub(toClipTime seconds: Double) {
+        let clamped = min(max(seconds, 0), clipDuration)
+        currentTimeInClip = clamped
+        player.seek(
+            to: CMTime(seconds: trimStartSeconds + clamped, preferredTimescale: 600),
+            toleranceBefore: .zero,
+            toleranceAfter: .zero
+        )
+    }
+
     private func seekToStart() {
+        currentTimeInClip = 0
         player.seek(
             to: CMTime(seconds: trimStartSeconds, preferredTimescale: 600),
             toleranceBefore: .zero,

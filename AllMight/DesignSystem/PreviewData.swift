@@ -8,29 +8,35 @@ import VBTVision
 enum PreviewData {
     /// 假的 3 下分析結果。
     static let analysis = SetAnalysis(
-        analysisVersion: 1,
+        analysisVersion: 2,
         parameters: .standard,
         reps: [
             RepMetrics(
                 index: 1,
-                concentric: PhaseMetrics(duration: 0.60, meanVelocity: 0.28, peakVelocity: 0.55, displacement: 0.45),
-                eccentric: PhaseMetrics(duration: 0.80, meanVelocity: 0.22, peakVelocity: 0.40, displacement: 0.45),
+                concentric: PhaseMetrics(duration: 0.60, meanVelocity: 0.28, peakVelocity: 0.55, displacement: 0.45,
+                                         startTime: 0.70, endTime: 1.30),
+                eccentric: PhaseMetrics(duration: 0.80, meanVelocity: 0.22, peakVelocity: 0.40, displacement: 0.45,
+                                        startTime: 0.00, endTime: 0.80),
                 mpv: 0.30,
                 restAfter: 1.40,
                 dropFromFirst: nil
             ),
             RepMetrics(
                 index: 2,
-                concentric: PhaseMetrics(duration: 0.64, meanVelocity: 0.25, peakVelocity: 0.50, displacement: 0.44),
-                eccentric: PhaseMetrics(duration: 0.82, meanVelocity: 0.20, peakVelocity: 0.37, displacement: 0.44),
+                concentric: PhaseMetrics(duration: 0.64, meanVelocity: 0.25, peakVelocity: 0.50, displacement: 0.44,
+                                         startTime: 2.70, endTime: 3.30),
+                eccentric: PhaseMetrics(duration: 0.82, meanVelocity: 0.20, peakVelocity: 0.37, displacement: 0.44,
+                                        startTime: 1.90, endTime: 2.70),
                 mpv: 0.27,
                 restAfter: 1.40,
                 dropFromFirst: (0.25 - 0.28) / 0.28
             ),
             RepMetrics(
                 index: 3,
-                concentric: PhaseMetrics(duration: 0.66, meanVelocity: 0.24, peakVelocity: 0.48, displacement: 0.43),
-                eccentric: PhaseMetrics(duration: 0.85, meanVelocity: 0.19, peakVelocity: 0.35, displacement: 0.43),
+                concentric: PhaseMetrics(duration: 0.66, meanVelocity: 0.24, peakVelocity: 0.48, displacement: 0.43,
+                                         startTime: 4.70, endTime: 5.30),
+                eccentric: PhaseMetrics(duration: 0.85, meanVelocity: 0.19, peakVelocity: 0.35, displacement: 0.43,
+                                        startTime: 3.90, endTime: 4.70),
                 mpv: 0.26,
                 restAfter: nil,
                 dropFromFirst: (0.24 - 0.28) / 0.28

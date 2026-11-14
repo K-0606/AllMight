@@ -30,6 +30,41 @@ struct PlateTrackerTests {
         #expect(box.maxY <= 1 + 1e-9)
     }
 
+    @Test("追蹤到的幀帶出正規化框寬（供 scaleMismatch），且與槓片大小同數量級")
+    func samplesCarryBoxWidth() async throws {
+        let width = 360, height = 640, fps = 60, frameCount = 60
+        let centers = SyntheticPlateVideo.verticalSinusoidCenters(
+            count: frameCount, width: width, height: height, margin: 120
+        )
+        let video = try await SyntheticPlateVideo.make(
+            orientedWidth: width, orientedHeight: height,
+            centersPx: centers, diameterPx: 110, fps: fps
+        )
+        defer { try? FileManager.default.removeItem(at: video.url) }
+
+        let reader = try await FrameReader(url: video.url, trimStartSeconds: 0, trimEndSeconds: 1)
+        let selection = PlateSelection(
+            centerX: centers[0].x / Double(width),
+            centerY: 1 - centers[0].y / Double(height),
+            diameterPx: 110
+        )
+        let tracker = PlateTracker(selection: selection, geometry: reader.geometry)
+
+        var tracked: [TrackSample] = []
+        while let frame = try reader.next() {
+            if let sample = try tracker.track(frame) { tracked.append(sample) }
+        }
+
+        // 首幀是使用者圈、不帶框寬；之後追蹤到的幀應帶正框寬。
+        let boxWidths = tracked.dropFirst().compactMap(\.boxWidth)
+        #expect(!boxWidths.isEmpty)
+        #expect(boxWidths.allSatisfy { $0 > 0 })
+        // 框寬換算像素應與槓片直徑同數量級（寬鬆界，追蹤框會略有漂移）。
+        let medianPx = boxWidths.sorted()[boxWidths.count / 2] * Double(reader.geometry.widthPx)
+        #expect(medianPx > 110 * 0.3)
+        #expect(medianPx < 110 * 3.0)
+    }
+
     @Test("槓片被長時間擋住時丟出 trackingLost，時間落在擋住區間內")
     func occlusionThrowsTrackingLost() async throws {
         let width = 360, height = 640, fps = 60

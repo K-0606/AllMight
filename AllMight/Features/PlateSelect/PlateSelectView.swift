@@ -71,7 +71,7 @@ struct PlateSelectView: View {
                 .onChange(of: geo.size) { _, size in model.updateContainer(size: size) }
             }
 
-            VStack {
+            VStack(spacing: Theme.Space.xs) {
                 Text(model.isCirclePlaced ? "調整圓圈貼齊槓片外緣" : "點一下你要追蹤的槓片")
                     .font(.footnote)
                     .foregroundStyle(Theme.Color.textPrimary)
@@ -79,6 +79,18 @@ struct PlateSelectView: View {
                     .padding(.vertical, Theme.Space.s)
                     .background(Theme.Color.surface.opacity(0.85), in: Capsule())
                     .padding(.top, Theme.Space.m)
+
+                if model.isCirclePlaced {
+                    // D-029：圓圈兼作比例尺，貼齊外緣越準；包進槓桿/背景會讓追蹤抖、校正偏。
+                    Text("圓圈剛好框住槓片外緣，速度與幅度才會準；不要包含槓桿或背景。")
+                        .font(.caption2)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Theme.Color.textSecondary)
+                        .padding(.horizontal, Theme.Space.m)
+                        .padding(.vertical, Theme.Space.xs)
+                        .background(Theme.Color.surface.opacity(0.7), in: Capsule())
+                }
+
                 Spacer()
             }
         }

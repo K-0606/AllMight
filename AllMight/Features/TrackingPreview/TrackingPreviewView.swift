@@ -56,6 +56,22 @@ struct TrackingPreviewView: View {
                 Spacer()
                 if model.phase == .ready {
                     VStack(spacing: Theme.Space.m) {
+                        if model.scaleMismatch {
+                            // 非阻擋性（D-029/§1）：追蹤框寬與使用者圈差 > 25%，圈可能沒貼齊槓片。
+                            HStack(alignment: .top, spacing: Theme.Space.s) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(Theme.Color.warning)
+                                    .accessibilityHidden(true)
+                                Text("追蹤到的槓片大小與你畫的圓圈相差較多，圓圈可能沒貼齊。返回上一步重新調整圓圈、貼齊槓片外緣會更準。")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.Color.textPrimary)
+                            }
+                            .padding(Theme.Space.m)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+                            .accessibilityElement(children: .combine)
+                        }
+
                         Button("重播") { model.replay() }
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(Theme.Color.background)

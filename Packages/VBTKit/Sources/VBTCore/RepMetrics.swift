@@ -12,17 +12,26 @@ public struct PhaseMetrics: Codable, Sendable, Equatable {
     public var peakVelocity: Double
     /// 位移量級（公尺）；顯示為 cm 時由 App 層換算。
     public var displacement: Double
+    /// 相位起點時間（秒，相對片段起點；對應 `Phase.startTime`）。
+    /// 供結果頁速度曲線標示每一下的範圍（R1、R2…）。舊紀錄（升級前）為 nil，顯示層略過範圍標示。
+    public var startTime: Double?
+    /// 相位終點時間（秒，相對片段起點；對應 `Phase.endTime`）。新資料滿足 `duration == endTime − startTime`。
+    public var endTime: Double?
 
     public init(
         duration: Double,
         meanVelocity: Double,
         peakVelocity: Double,
-        displacement: Double
+        displacement: Double,
+        startTime: Double? = nil,
+        endTime: Double? = nil
     ) {
         self.duration = duration
         self.meanVelocity = meanVelocity
         self.peakVelocity = peakVelocity
         self.displacement = displacement
+        self.startTime = startTime
+        self.endTime = endTime
     }
 }
 

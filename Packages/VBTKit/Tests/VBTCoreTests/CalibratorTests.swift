@@ -68,4 +68,54 @@ struct CalibratorTests {
         let out = Calibrator.calibrate(samples: [], selection: sel, geometry: geo, plateDiameterCm: 45)
         #expect(out.isEmpty)
     }
+
+    // MARK: - scaleMismatch（§1 比例尺差異警告）
+
+    /// widthPx 1080、圈直徑 450 px → 相符的正規化框寬約 450/1080 = 0.417。
+    let mismatchSel = PlateSelection(centerX: 0.5, centerY: 0.5, diameterPx: 450)
+    let mismatchGeo = VideoGeometry(widthPx: 1080, heightPx: 1920, nominalFPS: 60)
+
+    func boxSamples(boxWidth: Double?, count: Int) -> [TrackSample] {
+        (0..<count).map { TrackSample(time: Double($0) * 0.016, x: 0.5, y: 0.5, confidence: 0.9, boxWidth: boxWidth) }
+    }
+
+    @Test("scaleMismatch：框寬中位數與圈直徑差 > 25% → 警告")
+    func scaleMismatchTriggers() {
+        // 框寬 0.25 → 270 px，圈 450 px，相對差 0.4 > 0.25。
+        #expect(Calibrator.scaleMismatch(samples: boxSamples(boxWidth: 0.25, count: 20),
+                                         selection: mismatchSel, geometry: mismatchGeo))
+    }
+
+    @Test("scaleMismatch：框寬與圈接近 → 不警告")
+    func scaleMismatchWithinTolerance() {
+        // 框寬 0.41 → 442.8 px，相對差 ~0.016 < 0.25。
+        #expect(!Calibrator.scaleMismatch(samples: boxSamples(boxWidth: 0.41, count: 20),
+                                          selection: mismatchSel, geometry: mismatchGeo))
+    }
+
+    @Test("scaleMismatch：升級前舊樣本（無框寬）不警告")
+    func scaleMismatchNoBoxWidth() {
+        #expect(!Calibrator.scaleMismatch(samples: boxSamples(boxWidth: nil, count: 20),
+                                          selection: mismatchSel, geometry: mismatchGeo))
+    }
+
+    @Test("scaleMismatch：帶框寬樣本太少 → 不警告")
+    func scaleMismatchTooFewSamples() {
+        #expect(!Calibrator.scaleMismatch(samples: boxSamples(boxWidth: 0.25, count: 5),
+                                          selection: mismatchSel, geometry: mismatchGeo))
+    }
+
+    @Test("scaleMismatch：恰好 = minSamples（10）時仍判斷")
+    func scaleMismatchAtMinSamples() {
+        #expect(Calibrator.scaleMismatch(samples: boxSamples(boxWidth: 0.25, count: 10),
+                                         selection: mismatchSel, geometry: mismatchGeo))
+    }
+
+    @Test("scaleMismatch：相對差恰好 = 門檻（0.25）時不警告（用嚴格大於）")
+    func scaleMismatchExactlyAtThreshold() {
+        // 框寬 px = diameterPx × (1 − 0.25) = 337.5 → 正規化 337.5 / 1080。相對差正好 0.25，不觸發。
+        let boxWidth = (450.0 * 0.75) / 1080.0
+        #expect(!Calibrator.scaleMismatch(samples: boxSamples(boxWidth: boxWidth, count: 20),
+                                          selection: mismatchSel, geometry: mismatchGeo))
+    }
 }

@@ -190,3 +190,25 @@
 - 6. **影片檔單一擁有者 + 刪除後結果頁一致性（實機發現，2026-11-11）**：匯入的影片檔（Videos/<name>）在「當前分析流程」與「存檔後的紀錄」間是同一個檔（存檔不另複製，省空間）。實機發現：看完結果頁後若「返回」會倒退進已消耗的點選槓片/追蹤驗證/分析頁，那些頁仍握著該影片檔；若此時到歷史把該筆刪掉（連同影片檔），倒退回去的頁會讀不到檔（點選槓片頁一直轉圈、再分析丟 `videoUnreadable`）。決定：(a) 分析完成並存檔後把訓練堆疊**重設成只剩結果頁**（`path = [.result]`），讓「返回」回訓練首頁、不再回到消耗過的流程——同時使影片檔在存檔後只剩「紀錄」單一擁有者，並避免倒退重跑產生重複紀錄；(b) 結果頁用 `@Query` 反應式盯住自己的 `recordID`，被刪時切到「已刪除」狀態：影片播放器換成「影片已刪除」佔位、頂部顯示「這筆紀錄已被刪除，如需要請重新分析。」、隱藏「編輯」，但分析數字/曲線/次數仍從記憶體照常呈現。驗證：App build + test 綠（23/23）；導覽與 @Query 刪除狀態屬 UI 行為，需使用者實機驗證。替代：存檔時把影片複製成紀錄專屬檔（雙倍儲存、且會留下 session 匯入的孤兒檔，未採用）。
 - 驗證：`swift test` 103/103、App `xcodebuild test` 23/23（iPhone 17）。reviewer 處理項：統一 RPE 顯示格式（新增 `Formatters.rpe`，RPEPickerSheet/EditSetSheet/ResultView 共用，避免 locale 造成 `7,5`/`7.5` 不一致）、未存檔隱藏「編輯」、存檔失敗清孤兒樣本檔、`HistoryView` 重算/刪除改記 log、HistoryRow 合併 VoiceOver、EditSetSheet Stepper 補 accessibilityValue、強化 `SetAnalyzer` 等價與 trackingLost 測試、補 HistoryView `#Preview`。
 - 替代：只做 (a)（重算邏輯散在 App、難測等價）或只做 (b)（拿不到樣本）；(c) 升級時重新追蹤（違背 D-007、慢）；結果頁手動儲存按鈕（與「自動存」不符）；維持吃 `VideoClip`（歷史重看需造 `VideoInfo`，彆扭）。皆未採用。
+
+## D-031 M7 Q11：速度曲線逐下範圍標示 — PhaseMetrics 帶相位時間、analysisVersion 升 2
+- 2026-11-11 · 已決定（使用者，M7 開工前拍板「做」；實作時決定相容策略）
+- 背景：PRD §3.8 要求速度曲線標出每一下的範圍（R1、R2…），但 `RepMetrics`/`PhaseMetrics` 原本不含相位的起訖時間（M5 D-028 第 5 點刻意延後）。M7 把它補上。
+- 決定：
+  1. **加法式型別變更**：`PhaseMetrics` 新增 `startTime: Double?`、`endTime: Double?`（秒，相對片段起點），由 `MetricsCalculator` 從 `Phase.startTime/endTime` 帶出。向心相位的 `[startTime, endTime]` 即該下在時間軸上的範圍；結果頁 `VelocityChart` 以 `RectangleMark` 淡色區塊標出並標籤 R1、R2…。不改 §6 任何數值公式。
+  2. **欄位設 optional**：`recomputeIfNeeded` 以「完整解碼 `SetAnalysis` 讀版本」判斷是否升級重算；若新欄位為必填，M6 舊 `analysisData`（無此欄位）會在版本檢查前解碼失敗。改為 optional 後，舊 JSON 解碼為 nil、任何讀取路徑（結果頁/重算版本檢查）都不會崩；顯示層對 nil 略過範圍標示。
+  3. **`analysisVersion` 由 1 升為 2**：純為觸發 M6 舊紀錄經既有升級重算（`WorkoutStore.recomputeIfNeeded`→`SetAnalyzer.analyze`）補上相位時間欄位；重算產生的數值與原本完全相同，只多了新欄位。回答 Q2「版本維持或小升」：採「小升」，因使用者希望舊紀錄也能顯示範圍。配合升版更新 `VBTCoreTests`/`VBTVisionTests` 的版本斷言。
+- 驗證：`swift test` 104/104（VBTCore 新增 `MetricsCalculatorTests.phaseTimesMatchSegmentation`：相位時間與切分一致、等於網格時間戳、duration 一致、遞增；升版斷言）；App `xcodebuild test` 23/23（iPhone 17）；`BuildProject` 成功。回答 OPEN_QUESTIONS Q11。
+- 替代：`analysisVersion` 維持 1、舊紀錄永不補欄位（最省，但使用者想要舊紀錄也顯示範圍，未採用）；相位時間放 `RepMetrics` 層而非 `PhaseMetrics`（較不忠實於 `Phase`、離心範圍拿不到，未採用）；非 optional + 讓重算只解碼版本欄位（需改動解碼路徑且其他讀取點仍會壞，未採用）。
+
+## D-032 M7：scaleMismatch 比例尺警告落地（TrackSample.boxWidth、Calibrator.scaleMismatch）
+- 2026-11-11 · 已決定（使用者，M7 開工前拍板「做；optional boxWidth、版本維持」；實作時決定細節）
+- 背景：使用者圈同時兼作比例尺（`scale = 槓片公分 / 圈直徑px`，D-006），圈沒貼齊槓片外緣會整體高/低估速度與 ROM（D-029 實機觀察）。ALGORITHMS §1 一直規劃「追蹤框寬 vs 圈直徑差 > 25% → 警告」，但需 `TrackSample` 帶框寬（D-006 原只存中心點），M4 刻意延到 M7（D-027）。
+- 決定：
+  1. **`TrackSample` 加 optional `boxWidth`（Vision 正規化框寬）**：`PlateTracker` 在追蹤到的幀帶出 `box.width`（首幀回傳使用者圈、缺漏幀為 nil）。optional 以相容升級前存的 `Samples/<id>.json`（舊 JSON 無此欄位 → nil）。`TrackSample` 不在 `SetAnalysis` 內，故不影響 `SetAnalysis`/`AnalysisParameters` 的解碼。
+  2. **`Calibrator.scaleMismatch(samples:selection:geometry:thresholdFraction:minSamples:)` 純函式**：取帶框寬樣本的框寬中位數（換算 px）與 `selection.diameterPx` 相對比較，差 > `thresholdFraction`（預設 `scaleMismatchThreshold = 0.25`）回 true；帶框寬樣本 < `minSamples`（預設 10，含全為 nil 的舊樣本）回 false。
+  3. **門檻放「具名常數/函式預設參數」，不放 `AnalysisParameters`**：因 `AnalysisParameters` 被編碼進 `SetAnalysis`，加必填欄位會讓 M6 舊紀錄解碼失敗（`recomputeIfNeeded` 讀版本前需完整解碼）。scaleMismatch 門檻只影響「是否顯示警告」、從不參與重算或存檔，放具名常數（符合 swift-style「魔術數字放 AnalysisParameters 或具名常數」）最簡單、零相容風險。
+  4. **`analysisVersion` 維持（本變更不升版）**：`boxWidth` 不進任何速度/ROM 公式（比例尺仍用使用者圈，D-006），警告為 live 計算、不存進 `SetAnalysis`，故無數值變化、不需重算。（版本目前為 2，來自 D-031 的 Q11。）
+  5. **顯示在追蹤驗證頁**：`TrackingPreviewModel` 追蹤完成後以 `Calibrator.scaleMismatch` 算旗標，`TrackingPreviewView` 在 `.ready` 時顯示非阻擋性警告橫幅，提示「返回上一步重新圈選、貼齊槓片外緣會更準」。選在此頁因它是分析前的目視檢查點、且已有樣本（歷史重看不需此 live 警告）。
+- 驗證：`swift test` 109/109（VBTCore 新增 `CalibratorTests` 4：觸發/容忍內/無框寬/樣本太少；VBTVision 新增 `PlateTrackerTests.samplesCarryBoxWidth`：追蹤幀帶正框寬且與槓片同數量級）；App `xcodebuild test` 23/23（iPhone 17）；`BuildProject` 成功。**25% 門檻的實地校準、以及真實影片上是否會誤報/漏報，屬 M7 第二階段（需使用者實機 + 真實影片）。**
+- 替代：把 boxWidth 另存分離 sidecar（較複雜、與樣本格式脫鉤，未採用）；門檻放 `AnalysisParameters`（破壞 M6 舊紀錄解碼，未採用）；警告放結果頁或存進 `SetAnalysis`（需把框寬帶進 `SetAnalysis`、且歷史重看不需 live 警告，未採用）。
