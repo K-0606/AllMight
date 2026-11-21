@@ -9,6 +9,9 @@ Packages/VBTKit/.build/
 # 測試影片（含個人影像，不要 commit）
 TestVideos/
 
+# ML 模型來源與訓練資料（best.pt 等，不上傳；App 用的是打包進 VBTVision 的 Core ML）
+開發資料文件/
+
 # 影片檔不進 git（參考螢幕錄影等；超過 GitHub 100MB 限制，需保留請改用 Git LFS）
 *.mp4
 *.mov
