@@ -85,9 +85,19 @@
 
 ---
 
-## 後續版本（MVP 之後，未經同意不要實作）
-- V1.1 骨架與關節角度（VNDetectHumanBodyPoseRequest）
-- V1.1 半自動貼齊槓片（`VNDetectContoursRequest` 偵測圓形輪廓→**自動吸附圓圈到槓片外緣（建議圈）**，使用者仍可拖曳/縮放微調或重畫；偵測失敗自動退回現行純手動）。目的：消掉圈選殘差＝ROM 主要誤差來源（見 D-029/D-032、M7 Q6 決議）。全自動偵測槓片（連點選都省）更後面，需真實影片資料證明輪廓偵測夠穩再排。
+## V1.1 半自動貼齊槓片（ML 版，2026-11-16 開工、2026-11-21 實機可用；見 DECISIONS D-033）
+目的：消掉圈選殘差＝ROM 主要誤差來源。**原生輪廓偵測法已試過並全部退掉**（實機結構性失敗，見 D-033）；改用 **YOLO→Core ML** 偵測槓片。架構：起點幀跑 `VNCoreMLRequest` 偵測所有槓片框 → 使用者**點一下**選中框住點擊的那片 → 由框換算成 `PlateSelection`（直徑取**框高**）→ 當初始圈、仍可拖曳/縮放微調；偵測不到退回手動。**不改追蹤/校正數值路徑、`analysisVersion` 維持 2。** 分三階段做：Stage 1 偵測+標記、Stage 2 點選、Stage 3 直徑換算。
+- [x] 模型轉檔與打包：`best.pt`（YOLOv8n、1 類 Barbell）→ `BarbellDetector.mlpackage`（5.9 MB、含 NMS），放 VBTVision 套件資源、`Package.swift` `.copy`
+- [x] VBTCore：`DetectedPlate`（正規化框）+ `plateSelection(geometry:)`（框→圈，**直徑取框高**：垂直投影不受相機偏角/槓片厚度影響）+ `select(tapX:tapY:from:)`（點擊落框內、取中心最近）— `DetectedPlateTests` 8
+- [x] VBTVision `PlateDetector`（actor，Core ML）：讀起點幀 → **CoreImage 轉 8-bit sRGB CGImage**（修 HDR `verify_image_parameters`）→ `VNCoreMLRequest`（`.scaleFit`）→ `[DetectedPlate]`；模型載入**先找 `.mlmodelc`（App build 編譯後）否則 `.mlpackage`（SPM）**，修實機 `modelResourceMissing`；編譯快取於 actor — smoke + 無幀 + **真實硬舉影片座標無翻轉**測試
+- [x] Stage 1 App：進頁自動偵測、畫出所有框 + 可信度 + 狀態行（診斷用，暫留）— 實機確認偵測可用（紅片/ZIVA 皆框對）
+- [x] Stage 2 App：**點一下框選取**（同步命中測試）、高亮、可改選、點空白退回手動；VO per-plate 動作 — `PlateSelectModelTests` +5，實機確認
+- [x] Stage 3 App：選框換算成圈、**直徑用框高**；實機目視圈略偏大但方向正確（詳見下「待辦」）
+- [ ] 校正係數（可選）：實機看「框 vs 槓片外緣」若**一致**偏大/偏小，加具名校正係數；目前未加（單張量測不可信）
+- [ ] 後續精準化：補臥推/斜角訓練資料重訓、或換更貼的模型（標註只框外側圓面）、或框內橢圓長軸擬合
+- [ ] 移除畫面診斷行（`detectionErrorText`/「偵測到 N 個」；使用者要求暫留觀察）
+
+後續：全自動偵測槓片（連點選都省，需移動/關聯判斷）、骨架與關節角度（VNDetectHumanBodyPoseRequest）排其後。
 - V1.2 疊圖重播與影片匯出/下載：
   - 疊圖重播（拖曳逐幀、縮放）。
   - **把分析結果燒進影片一起輸出並儲存到相簿/分享**（`AVAssetExportSession` + `AVVideoComposition` + Core Animation layer，或等效合成）。

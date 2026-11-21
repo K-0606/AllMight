@@ -92,3 +92,26 @@ x_m[i] = (x[i] − x[0]) × widthPx  × scale     // 只用來畫軌跡
 - 邊界：只有 1 下、沒有任何動作、片段從動作中間開始、最後放下槓鈴、缺漏剛好 = maxGapFrames 與 +1、30fps 與 60fps、變動影格率時間戳。
 - 端對端：測試中用 `AVAssetWriter` 產生「圓盤上下移動」的合成影片（已知軌跡），跑 Vision 追蹤 + 全管線。見 skill `accuracy-check`。
 - 追蹤準確度（M2 實測）：中等速度每幀中心誤差 < 2 px、平均 < 1.5 px；直/橫拍一致 < 2 px。`VNTrackObjectRequest` 框中心即使靜止也有 ~0.9 px 固有偏差，故平均門檻為 1.5 px 而非 1 px（見 DECISIONS D-023）。真實影片準確度待實機驗證（OPEN_QUESTIONS Q10）。
+
+## 9. 半自動貼齊槓片（ML 偵測，V1.1，建議圈；見 DECISIONS D-033）
+只產生**建議的初始圈**，不改追蹤與校正的任何數值路徑；偵測失敗退回純手動。**原生輪廓偵測法已試過並退掉**（結構性失敗，見 D-033）。
+
+**流程**：起點幀 → `VNCoreMLRequest`（YOLOv8n→Core ML，`BarbellDetector.mlpackage`，`imageCropAndScaleOption = .scaleFit` 對齊 YOLO letterbox）偵測所有槓片框 → 使用者**點一下**選中框住點擊的那片 → 由框換算成 `PlateSelection`。
+
+**座標**：偵測框為 **Vision 正規化**（0–1、原點左下、轉正後影像；handler 帶 `frame.orientation`），與 `PlateSelection`/追蹤同慣例。`DetectedPlate.centerX/Y = box.midX/midY`。
+
+**框 → 直徑（Stage 3）**：
+```
+diameterPx = height × heightPx        // 取框「高」（垂直投影）
+```
+槓片是「直徑 45cm、厚度沿槓桿（水平）」的圓盤。側拍（相機大致水平、槓桿大致水平）時，**框高（垂直投影）＝真直徑**，與相機左右偏角、槓片厚度都無關：
+- 相機左右偏角 θ → **框寬**被透視壓縮成 `D·cosθ`（想由寬還原需知道未知的 θ，`D=寬/cosθ`，不可行）；框高不變＝D。
+- 厚片（如 200kg）→ 斜角時**框寬**還會被厚度側面灌水（`D·cosθ + 厚度·sinθ`）；框高仍是乾淨的 D。
+故取框高、繞過角度未知數。**已知殘差**：相機俯拍/槓桿明顯傾斜 → 框高失準（這時真直徑是橢圓長軸）；YOLO 框邊與槓片外緣若有系統性差異 → 可加校正係數（需真實畫面校準，暫未加）。
+緩解：**建議圈預設顯示且可拖曳/縮放**，最終比例尺仍以使用者調整後的圈為準（D-006）；更通用可改用框內**橢圓長軸**擬合（列後續）。
+
+**挑選**：點擊（正規化、原點左下）落在框內（`|x−cx| ≤ w/2 且 |y−cy| ≤ h/2`）者中，取框中心離點擊最近的那個；都不落在任何框內 → 回 nil（退回手動）。多槓片（架上收納片）由使用者的手指消歧義。
+
+**不影響 `analysisVersion`**：偵測只產生建議 `PlateSelection`，不碰 §1–§6 公式或 `PlateTracker`/`Calibrator` 數值；維持 2。
+
+**測試**：`DetectedPlate` 幾何（框內/外/邊界、重疊取最近、空、換算）在 VBTCore 純測；偵測載入+推論 smoke 測試在 VBTVision；真實影片座標/方向無翻轉以 `TestVideos/`（gitignore 時跳過）驗。真實影片偵測準確度（含臥推/斜角盲區）需實機目視（D-033、D-019）。

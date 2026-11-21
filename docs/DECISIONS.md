@@ -212,3 +212,26 @@
   5. **顯示在追蹤驗證頁**：`TrackingPreviewModel` 追蹤完成後以 `Calibrator.scaleMismatch` 算旗標，`TrackingPreviewView` 在 `.ready` 時顯示非阻擋性警告橫幅，提示「返回上一步重新圈選、貼齊槓片外緣會更準」。選在此頁因它是分析前的目視檢查點、且已有樣本（歷史重看不需此 live 警告）。
 - 驗證：`swift test` 109/109（VBTCore 新增 `CalibratorTests` 4：觸發/容忍內/無框寬/樣本太少；VBTVision 新增 `PlateTrackerTests.samplesCarryBoxWidth`：追蹤幀帶正框寬且與槓片同數量級）；App `xcodebuild test` 23/23（iPhone 17）；`BuildProject` 成功。**25% 門檻的實地校準、以及真實影片上是否會誤報/漏報，屬 M7 第二階段（需使用者實機 + 真實影片）。**
 - 替代：把 boxWidth 另存分離 sidecar（較複雜、與樣本格式脫鉤，未採用）；門檻放 `AnalysisParameters`（破壞 M6 舊紀錄解碼，未採用）；警告放結果頁或存進 `SetAnalysis`（需把框寬帶進 `SetAnalysis`、且歷史重看不需 live 警告，未採用）。
+
+## D-033 半自動貼齊改用 ML（YOLO→Core ML）偵測槓片；放寬 D-002 允許打包外部訓練模型
+- 2026-11-16 · 已決定（使用者）
+- 背景：原生輪廓偵測（`VNDetectContoursRequest` + 圓擬合）自動抓槓片**整套做過又全部退掉**（未留在 code base）。實機證實結構性失敗：健身房到處是比正在舉的槓片更乾淨的圓（架上收納片/滑輪/logo）；而正在舉的那片被身體遮/側拍變橢圓/模糊，外緣又被槓桿套筒/卡扣/盤面字切成碎片，逐條輪廓各自擬圓全數不過門檻（實機診斷：輪廓 1177、送擬合 342、候選 **0**）。輪廓法沒有「哪個圓是槓片」的語意，調參救不了。
+- 決定：
+  1. **改用 YOLO 物件偵測抓槓片**：使用者提供已訓練的 `best.pt`（YOLOv8n、1 類 `Barbell`、資料集 WeightPlate-2、50 epochs、imgsz 640）。實測 `TestVideos/` 深蹲/硬舉：信心 0.71–0.89、框緊貼槓片圓面；多槓片場景（架上收納片）全被框出 → 仍靠**使用者點一下**挑正在舉的那片。臥推斜角/遮擋那支 0 偵測＝已知盲區，待補資料重訓；偵測不到就退回手動。
+  2. **放寬 D-002（只用 Apple 原生、不加第三方）**：**執行端仍 100% 原生**——模型轉 Core ML、以 Vision `VNCoreMLRequest` 在裝置上跑，App 不加任何 SPM/第三方執行庫。**例外僅在於**：模型由外部工具（Ultralytics YOLO / PyTorch + coremltools）離線訓練/轉檔，產出的 `BarbellDetector.mlpackage`（5.9 MB）**當資源打包進 App**。使用者同意此例外。
+  3. **模型放 VBTVision 套件資源**（`resources: [.copy("Resources/BarbellDetector.mlpackage")]`），執行時 `MLModel.compileModel` 編譯載入、快取；偵測與既有 `FrameReader` 同層、可在 macOS `swift test`。
+  4. **架構＝YOLO 定位 + 使用者點選 + 框內精修直徑**：YOLO 回傳所有槓片框 → 使用者點一下選中框住點擊的那片 → 由框換算（v1 先用框尺寸，之後可在框內做圓/橢圓擬合精修）成 `PlateSelection`。**不改追蹤與校正數值路徑**（比例尺仍用最終圈，D-006）、`analysisVersion` 維持 2。偵測失敗退回現行手動圈。
+  5. **資料衛生**：原始影片/資料集不進 git；`.mlpackage`（出貨artefact）可進 git。
+- 驗證：Core ML 轉檔成功（5.9 MB，含 NMS，輸出 `confidence`/`coordinates`，Vision 視為物件偵測→`VNRecognizedObjectObservation`）；Swift 整合與實機驗證進行中。
+- 替代：純原生輪廓/RANSAC（輪廓已證失敗；RANSAC 使用者選擇跳過直接上 ML）；模型放 App target 由 Xcode 編譯（偵測碼得離開 VBTVision、與 FrameReader 脫節，未採用）；邊端用框邊當直徑不精修（v1 先如此，精修列後續）。
+- 取代說明：本筆放寬 D-002 的「不加第三方」，限定於「打包外部訓練的 Core ML 模型、執行端仍純原生」此一範圍；其餘 D-002 精神不變。
+- **2026-11-21 實作收斂（實機可用）**，過程見 memory `v1_1-ml-plate-detection`：
+  1. **分三階段落地**（避免整包一起失敗難除錯）：Stage 1 只偵測+畫框+可信度（純診斷,確認偵測在 App 內可用）、Stage 2 點一下框選取（同步命中測試,非吸附,無競態）、Stage 3 框→直徑換算。
+  2. **兩個裝置限定 bug（macOS 測試過、實機才現形）**：
+     (a) `modelResourceMissing`——Xcode App build 會把 `.copy` 的 `.mlpackage` **編成 `.mlmodelc`**，故載入要**先找 `.mlmodelc` 否則 `.mlpackage`**（後者是 SPM `swift test` 路徑）。
+     (b) `verify_image_parameters: invalid image bits/pixel`——HDR/10-bit 來源的 YUV 緩衝直接餵 Core ML 影像輸入會被拒；先用 **CoreImage render 成 8-bit sRGB CGImage** 再給 Vision。
+     關鍵除錯手法：把**真正的錯誤字串顯示到畫面**（而非含糊訊息）+ **直接檢查 build 出來的 `.app` bundle 內容**（看到 `.mlmodelc`）。
+  3. **直徑取「框高」而非寬/平均**（Stage 3，見 ALGORITHMS §9）：槓片是「直徑沿垂直、厚度沿水平槓桿」的圓盤，**框高＝垂直投影＝真直徑**，與相機左右偏角（寬被壓成 D·cosθ）與厚片厚度（寬被側面灌水）都無關；用高度繞過未知的相機角度。手動圈走 width 軸、建議圈走 height 軸，在正方形像素（iPhone 恆成立）下等價。
+  4. **未加校正係數**：實機目視圈「略偏大」，但以程式自動量真實槓片直徑（Hough）不可信、亂猜係數可能更糟 → 留待使用者跨多片目視確認「一致」偏差後再加具名係數。
+  5. **畫面診斷行暫留**（`偵測到 N 個 / 偵測失敗：<error>`），使用者要求先留著觀察，正式版再移除。
+  6. 經 algorithm-reviewer 審查（無 must-fix；補「正方形像素假設」註解與等距 select 測試）。ios-reviewer 子代理因連線/額度中斷未能執行，改由 Agent inline 審 App 層（並行/手勢/座標/無殘骸皆 OK）——正式一次待額度恢復補跑。
